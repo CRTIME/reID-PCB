@@ -9,17 +9,16 @@ from scipy.spatial.distance import cdist
 from net import FeatureExtractor
 from data import Market1501
 from config import transform
-from config import conf
 from utils import get_time
 
-def extract_feat(extractor, dataloader, feat_dim):
+def extract_feat(args, extractor, dataloader, feat_dim):
     feat = []
     labels = []
     cameras = []
     for i, data in enumerate(dataloader):
         inputs, l, c = data
         inputs = Variable(inputs)
-        if conf['use_gpu']:
+        if args.use_gpu:
             inputs = inputs.cuda()
         outputs = extractor.forward(inputs)
         feat.append(outputs)
@@ -61,31 +60,33 @@ def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
     mAP /= np.shape(dist)[0]
     return mAP
 
-def test(last_conv=True):
+def test(args):
+    last_conv = args.last_conv == 1
     torch_home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
     dataset_path = os.path.join(torch_home, 'datasets')
-    state_path = os.path.join(torch_home, 'models', conf['model_name'])
-
-    print('%s [START] Loading Test Data' % get_time())
-    queryset = Market1501(dataset_path, data_type='query', transform=transform)
-    queryloader = DataLoader(queryset, batch_size=64)
-    print('%s [ END ] Loading Test Data' % get_time())
-
-    print('%s [START] Loading Query Data' % get_time())
-    testset = Market1501(dataset_path, data_type='test', transform=transform)
-    testloader = DataLoader(testset, batch_size=64)
-    print('%s [ END ] Loading Query Data' % get_time())    
+    state_path = os.path.join(torch_home, 'models', args.params_filename)
 
     feat_extractor = FeatureExtractor(state_path=state_path, last_conv=last_conv)
 
     feat_dim = 2048
     if last_conv: feat_dim = 256
-    
+
+    print('%s [START] Loading Test Data' % get_time())
+    queryset = Market1501(dataset_path, data_type='query', transform=transform)
+    queryloader = DataLoader(queryset, batch_size=64, num_workers=20)
+    print('%s [ END ] Loading Test Data' % get_time())
+
     print('%s [START] Extracting Query Features' % get_time())
-    query_feat, query_labels, query_cameras = extract_feat(feat_extractor, queryloader, feat_dim)
+    query_feat, query_labels, query_cameras = extract_feat(args, feat_extractor, queryloader, feat_dim)
     print('%s [ END ] Extracting Query Features' % get_time())
+
+    print('%s [START] Loading Query Data' % get_time())
+    testset = Market1501(dataset_path, data_type='test', transform=transform)
+    testloader = DataLoader(testset, batch_size=64, num_workers=20)
+    print('%s [ END ] Loading Query Data' % get_time())    
+
     print('%s [START] Extracting Test Features' % get_time())
-    test_feat, test_labels, test_cameras = extract_feat(feat_extractor, testloader, feat_dim)
+    test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
     print('%s [ END ] Extracting Test Features' % get_time())
 
     print('%s [START] Extracting Test Features' % get_time())

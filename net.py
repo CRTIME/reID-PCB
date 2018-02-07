@@ -13,7 +13,7 @@ class Net(nn.Module):
         backbone_model = nn.Sequential(*list(resnet.children())[:-2])
         
         self.resnet = backbone_model
-        self.resnet = nn.DataParallel(self.resnet)
+        self.resnet = self.resnet
         
         init_val = [torch.zeros(24, 8) for _ in range(6)]
         for i in range(6):

@@ -8,7 +8,8 @@ transform = transforms.Compose([
 ])
 
 conf = {
-    'use_gpu': True,
-    'model_name': 'mynet.pth'
+    'gpu': True,
+    'dist': True,
+    'filename': 'mynet'
 }
 
