@@ -16,6 +16,8 @@ if __name__ == '__main__':
     parser.add_argument('--dist-url', type=str, default='tcp://127.0.0.1:2222', help='the master-node\'s address and port')
     parser.add_argument('--dist-rank', type=int, default=0, help='rank of distributed process. (default 0)')
     parser.add_argument('--last-conv', type=int, default=1, help='whether contains last convolution layter. (default 1)')
+    parser.add_argument('--batch-size', type=int, default=64, help='training data batch size. (default 64)')
+    parser.add_argument('--num-workers', type=int, default=20, help='number of workers when loading data. (default 20)')
     args = parser.parse_args()
     args.home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
     args.dataset = os.path.join(args.home, 'datasets')

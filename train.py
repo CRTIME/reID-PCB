@@ -86,8 +86,8 @@ def train(args):
         train_sampler = DistributedSampler(trainset)
     else: 
         train_sampler = None
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
-        shuffle=(train_sampler is None), num_workers=20, pin_memory=True, sampler=train_sampler)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
+        shuffle=(train_sampler is None), num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
     log('[ END ] Loading Training Data')
 
     log('[START] Build Net')

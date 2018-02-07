@@ -84,7 +84,7 @@ def test(args):
 
     log('[START] Loading Test Data')
     queryset = Market1501(args.dataset, data_type='query', transform=transform)
-    queryloader = DataLoader(queryset, batch_size=64, num_workers=20)
+    queryloader = DataLoader(queryset, batch_size=args.batch_sampler, num_workers=args.num_workers)
     log('[ END ] Loading Test Data')
 
     log('[START] Extracting Query Features')
@@ -93,7 +93,7 @@ def test(args):
 
     log('[START] Loading Query Data')
     testset = Market1501(args.dataset, data_type='test', transform=transform)
-    testloader = DataLoader(testset, batch_size=64, num_workers=20)
+    testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
     log('[ END ] Loading Query Data')    
 
     log('[START] Extracting Test Features')
