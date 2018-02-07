@@ -34,7 +34,7 @@ class Market1501(data.Dataset):
             self.folder = os.path.join(self.root, self.base_folder, self.query_folder)
 
         self.pattern = re.compile(r'^(\-1|\d{4})_c(\d)s\d_\d{6}_\d{2}.*\.jpg$')
-        self.file_list = filter(self.pattern.search, os.listdir(self.folder))
+        self.file_list = list(filter(self.pattern.search, os.listdir(self.folder)))
         
         if self.once:
             self.load_data_at_once() 
