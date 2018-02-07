@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torchvision.models import resnet50
 
 class Net(nn.Module):
-    def __init__(self, out_size=10):
+    def __init__(self, out_size=1501):
         super(Net, self).__init__()
 
         resnet = resnet50(pretrained=True)

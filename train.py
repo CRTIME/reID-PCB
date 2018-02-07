@@ -81,7 +81,7 @@ def train(args):
             world_size=args.world_size, rank=args.dist_rank)
 
     log('[START] Loading Training Data')
-    trainset = Market1501(root=args.dataset, data_type='train', transform=transform)
+    trainset = Market1501(root=args.dataset, data_type='train', transform=transform, once=args.load_once)
     if args.distributed: 
         train_sampler = DistributedSampler(trainset)
     else: 
@@ -91,12 +91,12 @@ def train(args):
     log('[ END ] Loading Training Data')
 
     log('[START] Build Net')
-    net = Net(trainset.train_size)
+    net = Net()
     criterion = MyCrossEntropyLoss()
-    if args.use_gpu: 
+    if args.use_gpu:
         net = net.cuda()
         criterion = criterion.cuda()
-    if args.distributed: 
+    if args.distributed:
         net = DistributedDataParallel(net)
     else: 
         net = DataParallel(net)

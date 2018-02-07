@@ -18,7 +18,7 @@ def extract_feat(args, extractor, dataloader, feat_dim):
     cameras = []
     for i, data in enumerate(dataloader):
         inputs, l, c = data
-        inputs = Variable(inputs)
+        inputs = Variable(inputs, volatile=True)
         if args.use_gpu:
             inputs = inputs.cuda()
         outputs = extractor.forward(inputs)
@@ -83,7 +83,7 @@ def test(args):
     if last_conv: feat_dim = 256
 
     log('[START] Loading Test Data')
-    queryset = Market1501(args.dataset, data_type='query', transform=transform)
+    queryset = Market1501(args.dataset, data_type='query', transform=transform, once=args.load_once)
     queryloader = DataLoader(queryset, batch_size=args.batch_sampler, num_workers=args.num_workers)
     log('[ END ] Loading Test Data')
 
@@ -92,9 +92,9 @@ def test(args):
     log('[ END ] Extracting Query Features')
 
     log('[START] Loading Query Data')
-    testset = Market1501(args.dataset, data_type='test', transform=transform)
+    testset = Market1501(args.dataset, data_type='test', transform=transform, once=args.load_once)
     testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
-    log('[ END ] Loading Query Data')    
+    log('[ END ] Loading Query Data')
 
     log('[START] Extracting Test Features')
     test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
