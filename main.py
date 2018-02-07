@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 from train import train
@@ -5,8 +6,7 @@ from test import test
 
 def main(args):
     train(args)
-    test(args)
-    
+    test(args)  
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Person Re-Identification Reproduce')
@@ -17,5 +17,8 @@ if __name__ == '__main__':
     parser.add_argument('--dist-rank', type=int, default=0, help='rank of distributed process. (default 0)')
     parser.add_argument('--last-conv', type=int, default=1, help='whether contains last convolution layter. (default 1)')
     args = parser.parse_args()
+    args.home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
+    args.dataset = os.path.join(args.home, 'datasets')
+    args.model_file = os.path.join(args.home, 'models', args.params_filename)
     args.distributed = args.world_size > 1
     main(args)

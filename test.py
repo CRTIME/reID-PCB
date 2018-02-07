@@ -6,6 +6,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from scipy.spatial.distance import cdist
 
+from utils import log
 from net import FeatureExtractor
 from data import Market1501
 from config import transform
@@ -76,41 +77,37 @@ def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_lab
 
 def test(args):
     last_conv = args.last_conv == 1
-    torch_home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
-    dataset_path = os.path.join(torch_home, 'datasets')
-    state_path = os.path.join(torch_home, 'models', args.params_filename)
-
-    feat_extractor = FeatureExtractor(state_path=state_path, last_conv=last_conv)
+    feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=last_conv)
 
     feat_dim = 2048
     if last_conv: feat_dim = 256
 
-    print('%s [START] Loading Test Data' % get_time())
-    queryset = Market1501(dataset_path, data_type='query', transform=transform)
+    log('[START] Loading Test Data')
+    queryset = Market1501(args.dataset, data_type='query', transform=transform)
     queryloader = DataLoader(queryset, batch_size=64, num_workers=20)
-    print('%s [ END ] Loading Test Data' % get_time())
+    log('[ END ] Loading Test Data')
 
-    print('%s [START] Extracting Query Features' % get_time())
+    log('[START] Extracting Query Features')
     query_feat, query_labels, query_cameras = extract_feat(args, feat_extractor, queryloader, feat_dim)
-    print('%s [ END ] Extracting Query Features' % get_time())
+    log('[ END ] Extracting Query Features')
 
-    print('%s [START] Loading Query Data' % get_time())
-    testset = Market1501(dataset_path, data_type='test', transform=transform)
+    log('[START] Loading Query Data')
+    testset = Market1501(args.dataset, data_type='test', transform=transform)
     testloader = DataLoader(testset, batch_size=64, num_workers=20)
-    print('%s [ END ] Loading Query Data' % get_time())    
+    log('[ END ] Loading Query Data')    
 
-    print('%s [START] Extracting Test Features' % get_time())
+    log('[START] Extracting Test Features')
     test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
-    print('%s [ END ] Extracting Test Features' % get_time())
+    log('[ END ] Extracting Test Features')
 
-    print('%s [START] Extracting Test Features' % get_time())
+    log('[START] Extracting Test Features')
     dist = get_dist(query_feat, test_feat)
-    print('%s [ END ] Extracting Test Features' % get_time())
+    log('[ END ] Extracting Test Features')
 
-    print('%s [START] Evaluating mAP, Rank-x' % get_time())
+    log('[START] Evaluating mAP, Rank-x')
     mAP = get_map(dist, query_labels, query_cameras, test_labels, test_cameras)
     rank1 = get_rank_x(1, dist, query_labels, query_cameras, test_labels, test_cameras)
     rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
-    print('%s [ END ] Evaluating mAP, Rank-x' % get_time())
+    log('[ END ] Evaluating mAP, Rank-x')
 
     return mAP, rank1, rank10

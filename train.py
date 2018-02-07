@@ -3,8 +3,11 @@ import torch
 import torch.optim as optim
 from torch.autograd import Variable
 import torch.distributed as dist
+from torch.nn import DataParallel
 from torch.utils.data.distributed import DistributedSampler
+from torch.nn.parallel import DistributedDataParallel
 
+from utils import log
 from config import transform
 from data import Market1501
 from utils import get_time
@@ -37,7 +40,7 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
             
             epoch_loss += loss.data[0]
             if i % 20 == 19:
-                print('%s [%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (get_time(), args.process_name, epoch, i, epoch_loss / 20))
+                log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (args.process_name, epoch, i, epoch_loss / 20))
                 epoch_loss = .0
 
 def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
@@ -74,44 +77,37 @@ def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
 def train(args):
 
     if args.distributed:
-        dist.init_process_group(backend='gloo', init_method=args.dist_url, world_size=args.world_size, rank=args.dist_rank)
+        dist.init_process_group(backend='gloo', init_method=args.dist_url, 
+            world_size=args.world_size, rank=args.dist_rank)
 
-    print('%s [START] Loading Training Data' % get_time())
-    torch_home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
-    trainset = Market1501(root=os.path.join(torch_home, 'datasets'), data_type='train', transform=transform)
-
-    if args.distributed:
+    log('[START] Loading Training Data')
+    trainset = Market1501(root=args.dataset, data_type='train', transform=transform)
+    if args.distributed: 
         train_sampler = DistributedSampler(trainset)
-    else:
+    else: 
         train_sampler = None
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
+        shuffle=(train_sampler is None), num_workers=20, pin_memory=True, sampler=train_sampler)
+    log('[ END ] Loading Training Data')
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=(train_sampler is None), 
-        num_workers=20, pin_memory=True, sampler=train_sampler)
-
-    print('%s [ END ] Loading Training Data' % get_time())
-
-    print('%s [START] Build Net' % get_time())
+    log('[START] Build Net')
     net = Net(trainset.train_size)
-    if args.use_gpu:
-        net = net.cuda()
-    if args.distributed:
-        net = torch.nn.parallel.DistributedDataParallel(net)
-    else:
-        net = torch.nn.DataParallel(net)
-    print('%s [ END ] Building Net' % get_time())
-
-    print('%s [START] Building Criterion' % get_time())
     criterion = MyCrossEntropyLoss()
-    if args.use_gpu:
+    if args.use_gpu: 
+        net = net.cuda()
         criterion = criterion.cuda()
-    print('%s [ END ] Building Criterion' % get_time())
+    if args.distributed: 
+        net = DistributedDataParallel(net)
+    else: 
+        net = DataParallel(net)
+    log('[ END ] Building Net')
 
-    print('%s [START] Training' % get_time())
+    log('[START] Training')
     standard_pcb_train(args, net, criterion, trainloader, train_sampler)
     refined_pcb_train(args, net, criterion, trainloader, train_sampler)
     overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
-    print('%s [ END ] Training' % get_time())
+    log('[ END ] Training')
 
-    print('%s [START] Saving Model' % get_time())
-    torch.save(net.cpu().state_dict(), os.path.join(torch_home, 'models', args.params_filename))
-    print('%s [ END ] Saving Model' % get_time())
+    log('[START] Saving Model')
+    torch.save(net.module.cpu().state_dict(), args.model_file)
+    log('[ END ] Saving Model')
