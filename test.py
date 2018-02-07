@@ -28,7 +28,7 @@ def extract_feat(args, extractor, dataloader, feat_dim):
     feat.view(-1, feat_dim)
     labels = torch.cat(labels)
     cameras = torch.cat(cameras)
-    return feat, labels, cameras
+    return feat.cpu().data.numpy(), labels.numpy(), cameras.numpy()
 
 def get_dist(query, test):
     return cdist(query, test)
@@ -59,6 +59,20 @@ def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
         mAP += ap
     mAP /= np.shape(dist)[0]
     return mAP
+
+def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_labels, test_cameras):
+    print('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
+    f = open('test_result.txt', 'a+')
+    for i, row in enumerate(dist):
+        ql, qc = query_labels[i], query_cameras[i]
+        s = '[%d,%d]' % (ql, qc)
+        index = np.argsort(row)[::-1]
+        for j in index:
+            tl, tc = test_labels[j], test_cameras[j]
+            s += '\t[%d,%d]' % (tl, tc)
+        s += '\n'
+        f.write(s)
+    f.close()
 
 def test(args):
     last_conv = args.last_conv == 1

@@ -11,32 +11,34 @@ from utils import get_time
 from net import Net
 from net import MyCrossEntropyLoss
 
-def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60, gpu=True):
-    for epoch in range(60):
-        
-        train_sampler.set_epoch(epoch)
+def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60):
+    for epoch in range(args.epoch):
+        if args.distributed:
+            train_sampler.set_epoch(epoch)
 
         optimizer = optimizer_40
         if epoch >= 40:
             optimizer = optimizer_60
         
-        running_loss = .0
+        epoch_loss = .0
         for i, data in enumerate(trainloader):
             inputs, labels, _ = data
-            if gpu:
+            if args.use_gpu:
                 inputs, labels = Variable(inputs).cuda(), Variable(labels).cuda()
             else:
                 inputs, labels = Variable(inputs), Variable(labels)
+
             outputs = net.forward(inputs)
-            optimizer.zero_grad()
             loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
-            running_loss += loss.data[0]
+            epoch_loss += loss.data[0]
             if i % 20 == 19:
-                print('%s [%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (get_time(), args.process_name, epoch, i, running_loss / 20))
-                running_loss = .0
+                print('%s [%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (get_time(), args.process_name, epoch, i, epoch_loss / 20))
+                epoch_loss = .0
 
 def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
     optimizer_40 = optim.SGD([
@@ -51,22 +53,21 @@ def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
         { 'params': net.module.conv1.parameters() },
         { 'params': net.module.fcs.parameters() }
     ], lr=0.01)
+    args.epoch = 60
     args.process_name = 'standard_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
 
 def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD([
-        { 'params': net.module.Ws.parameters() }
-    ], lr=0.1)
-    optimizer_60 = optim.SGD([
-        { 'params': net.module.Ws.parameters() }
-    ], lr=0.01)
+    optimizer_40 = optim.SGD(net.module.Ws.parameters(), lr=0.1)
+    optimizer_60 = optim.SGD(net.module.Ws.parameters(), lr=0.01)
+    args.epoch = 70    
     args.process_name = 'refined_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
     
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
     optimizer_40 = optim.SGD(net.module.parameters(), lr=0.1)
     optimizer_60 = optim.SGD(net.module.parameters(), lr=0.01)
+    args.epoch = 70    
     args.process_name = 'overall_fine_tune_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
 
@@ -102,7 +103,7 @@ def train(args):
     print('%s [START] Building Criterion' % get_time())
     criterion = MyCrossEntropyLoss()
     if args.use_gpu:
-        criterion.cuda()
+        criterion = criterion.cuda()
     print('%s [ END ] Building Criterion' % get_time())
 
     print('%s [START] Training' % get_time())
