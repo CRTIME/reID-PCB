@@ -76,11 +76,10 @@ def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_lab
     f.close()
 
 def test(args):
-    last_conv = args.last_conv == 1
-    feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=last_conv)
+    feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=args.last_conv)
 
     feat_dim = 2048
-    if last_conv: feat_dim = 256
+    if args.last_conv: feat_dim = 256
 
     log('[START] Loading Test Data')
     queryset = Market1501(args.dataset, data_type='query', transform=transform, once=args.load_once)

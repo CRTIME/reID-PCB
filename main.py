@@ -20,6 +20,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=20, help='number of workers when loading data. (default 20)')
     parser.add_argument('--load-once', type=int, default=0, help='load all of data at once. (default 0)')
     args = parser.parse_args()
+    args.use_gpu = args.use_gpu == 1
+    args.last_conv = args.last_conv == 1
     args.home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
     args.dataset = os.path.join(args.home, 'datasets')
     args.model_file = os.path.join(args.home, 'models', args.params_filename)

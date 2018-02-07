@@ -14,6 +14,11 @@ from utils import get_time
 from net import Net
 from net import MyCrossEntropyLoss
 
+def get_net(args, net):
+    if args.use_gpu:
+        return net.module
+    return net
+
 def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60):
     for epoch in range(args.epoch):
         if args.distributed:
@@ -45,31 +50,31 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
 
 def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
     optimizer_40 = optim.SGD([
-        { 'params': net.module.resnet.parameters(), 'lr': 0.01 },
-        { 'params': net.module.avgpool.parameters() },
-        { 'params': net.module.conv1.parameters() },
-        { 'params': net.module.fcs.parameters() }
+        { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.01 },
+        { 'params': get_net(args, net).avgpool.parameters() },
+        { 'params': get_net(args, net).conv1.parameters() },
+        { 'params': get_net(args, net).fcs.parameters() }
     ], lr=0.1)
     optimizer_60 = optim.SGD([
-        { 'params': net.module.resnet.parameters(), 'lr': 0.001 },
-        { 'params': net.module.avgpool.parameters() },
-        { 'params': net.module.conv1.parameters() },
-        { 'params': net.module.fcs.parameters() }
+        { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.001 },
+        { 'params': get_net(args, net).avgpool.parameters() },
+        { 'params': get_net(args, net).conv1.parameters() },
+        { 'params': get_net(args, net).fcs.parameters() }
     ], lr=0.01)
     args.epoch = 60
     args.process_name = 'standard_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
 
 def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD(net.module.Ws.parameters(), lr=0.1)
-    optimizer_60 = optim.SGD(net.module.Ws.parameters(), lr=0.01)
+    optimizer_40 = optim.SGD(get_net(args, net).Ws.parameters(), lr=0.1)
+    optimizer_60 = optim.SGD(get_net(args, net).Ws.parameters(), lr=0.01)
     args.epoch = 70    
     args.process_name = 'refined_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
     
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD(net.module.parameters(), lr=0.1)
-    optimizer_60 = optim.SGD(net.module.parameters(), lr=0.01)
+    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.1)
+    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.01)
     args.epoch = 70    
     args.process_name = 'overall_fine_tune_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
@@ -92,14 +97,14 @@ def train(args):
 
     log('[START] Build Net')
     net = Net()
-    criterion = MyCrossEntropyLoss()
+    criterion = MyCrossEntropyLoss(args)
     if args.use_gpu:
         net = net.cuda()
         criterion = criterion.cuda()
-    if args.distributed:
-        net = DistributedDataParallel(net)
-    else: 
-        net = DataParallel(net)
+        if args.distributed:
+            net = DistributedDataParallel(net)
+        else:
+            net = DataParallel(net)
     log('[ END ] Building Net')
 
     log('[START] Training')
@@ -109,5 +114,5 @@ def train(args):
     log('[ END ] Training')
 
     log('[START] Saving Model')
-    torch.save(net.module.cpu().state_dict(), args.model_file)
+    torch.save(get_net(args, net).cpu().state_dict(), args.model_file)
     log('[ END ] Saving Model')

@@ -58,10 +58,13 @@ class FeatureExtractor(Net):
         return x
 
 class MyCrossEntropyLoss(nn.CrossEntropyLoss):
-    def __init__(self):
+    def __init__(self, args):
         super(MyCrossEntropyLoss, self).__init__()
+        self.use_gpu = args.use_gpu
     def forward(self, inputs, target):
-        ret = Variable(torch.FloatTensor([0])).cuda()
+        ret = Variable(torch.FloatTensor([0])).cuda()        
+        if not self.use_gpu:
+            ret = Variable(torch.FloatTensor([0]))
         for ipt in inputs:
             ret += F.cross_entropy(ipt, target, self.weight, self.size_average,
                                    self.ignore_index, self.reduce)
