@@ -7,7 +7,7 @@ from test import test
 def main(args):
     if args.stage == 'all' or args.stage == 'train':
         train(args)
-    if args.stage == 'all' or args.stage == 'train':    
+    if args.stage == 'all' or args.stage == 'test':    
         test(args)  
 
 if __name__ == '__main__':
