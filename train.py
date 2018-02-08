@@ -11,7 +11,7 @@ from utils import log
 from config import transform
 from data import Market1501
 from utils import get_time
-from net import Net
+from net import MyNet
 from net import MyCrossEntropyLoss
 
 def get_net(args, net):
@@ -94,7 +94,7 @@ def train(args):
     log('[ END ] Loading Training Data')
 
     log('[START] Build Net')
-    net = Net()
+    net = MyNet()
     criterion = MyCrossEntropyLoss(args)
     if args.use_gpu:
         net = net.cuda()
