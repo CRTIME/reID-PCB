@@ -4,6 +4,7 @@ import numpy as np
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
+from torch.nn import DataParallel
 from scipy.spatial.distance import cdist
 
 from utils import log
@@ -79,6 +80,7 @@ def test(args):
 
     feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=args.last_conv)
     if args.use_gpu:
+        feat_extractor = DataParallel(feat_extractor)
         feat_extractor.cuda()
 
     feat_dim = 2048
@@ -102,9 +104,9 @@ def test(args):
     test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
     log('[ END ] Extracting Test Features')
 
-    log('[START] Extracting Test Features')
+    log('[START] Calculating Distances')
     dist = get_dist(query_feat, test_feat)
-    log('[ END ] Extracting Test Features')
+    log('[ END ] Calculating Distances')
 
     log('[START] Evaluating mAP, Rank-x')
     mAP = get_map(dist, query_labels, query_cameras, test_labels, test_cameras)
