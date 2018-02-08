@@ -30,7 +30,7 @@ class Net(nn.Module):
         for i in range(6):
             x_i = torch.mul(x, self.Ws[i])
             x_i = self.avgpool(x_i)
-            x_i = self.conv1(x_i)
+            x_i = F.relu(self.conv1(x_i))
             x_i = x_i.view(-1, 256)
             x_i = self.fcs[i](x_i)
             xs[i] = x_i
@@ -49,7 +49,7 @@ class FeatureExtractor(Net):
             x_i = torch.mul(x, self.Ws[i])
             x_i = self.avgpool(x_i)
             if self.last_conv:
-                x_i = self.conv1(x_i)
+                x_i = F.relu(self.conv1(x_i))
                 x_i = x_i.view(-1, 256)
             else:
                 x_i = x_i.view(-1, 2048)
