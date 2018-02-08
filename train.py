@@ -61,21 +61,18 @@ def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
         { 'params': get_net(args, net).conv1.parameters() },
         { 'params': get_net(args, net).fcs.parameters() }
     ], lr=0.01)
-    args.epoch = 60
     args.process_name = 'standard_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
 
 def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
     optimizer_40 = optim.SGD(get_net(args, net).Ws.parameters(), lr=0.1)
     optimizer_60 = optim.SGD(get_net(args, net).Ws.parameters(), lr=0.01)
-    args.epoch = 70    
     args.process_name = 'refined_pcb_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
     
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
     optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.1)
     optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.01)
-    args.epoch = 70    
     args.process_name = 'overall_fine_tune_train'
     base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
 

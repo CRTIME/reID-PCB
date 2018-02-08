@@ -40,7 +40,7 @@ class FeatureExtractor(Net):
     def __init__(self, state_path, last_conv=True):
         super(FeatureExtractor, self).__init__()
         self.last_conv = last_conv
-        self.load_state_dict(torch.load(state_path))
+        self.load_state_dict(torch.load(state_path), strict=False)
 
     def forward(self, x):
         x = self.resnet.forward(x)

@@ -76,24 +76,27 @@ def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_lab
     f.close()
 
 def test(args):
+
     feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=args.last_conv)
+    if args.use_gpu:
+        feat_extractor.cuda()
 
     feat_dim = 2048
     if args.last_conv: feat_dim = 256
 
-    log('[START] Loading Test Data')
+    log('[START] Loading Query Data')
     queryset = Market1501(args.dataset, data_type='query', transform=transform, once=args.load_once)
-    queryloader = DataLoader(queryset, batch_size=args.batch_sampler, num_workers=args.num_workers)
-    log('[ END ] Loading Test Data')
+    queryloader = DataLoader(queryset, batch_size=args.batch_size, num_workers=args.num_workers)
+    log('[ END ] Loading Query Data')
 
     log('[START] Extracting Query Features')
     query_feat, query_labels, query_cameras = extract_feat(args, feat_extractor, queryloader, feat_dim)
     log('[ END ] Extracting Query Features')
 
-    log('[START] Loading Query Data')
+    log('[START] Loading Test Data')
     testset = Market1501(args.dataset, data_type='test', transform=transform, once=args.load_once)
     testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
-    log('[ END ] Loading Query Data')
+    log('[ END ] Loading Test Data')
 
     log('[START] Extracting Test Features')
     test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
