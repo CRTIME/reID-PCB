@@ -114,4 +114,6 @@ def test(args):
     rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
     log('[ END ] Evaluating mAP, Rank-x')
 
+    print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_labels, test_cameras)
+
     return mAP, rank1, rank10
