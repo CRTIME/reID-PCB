@@ -74,7 +74,7 @@ class Net(nn.Module):
             xs[i] = x_i
         return xs
 
-class FeatureExtractor(MyNet):
+class FeatureExtractor(Net):
     def __init__(self, state_path, last_conv=True):
         super(FeatureExtractor, self).__init__()
         self.last_conv = last_conv
