@@ -17,7 +17,8 @@ def extract_feat(args, extractor, dataloader, feat_dim):
     feat = []
     labels = []
     cameras = []
-    for i, data in enumerate(dataloader):
+    for _, data in enumerate(dataloader):
+        extractor.eval()
         inputs, l, c = data
         inputs = Variable(inputs, volatile=True)
         if args.use_gpu:
@@ -38,7 +39,7 @@ def get_dist(query, test):
 def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
     rank_x = 0
     for i, row in enumerate(dist):
-        index = np.argsort(row)[:-x-1:-1]
+        index = np.argsort(row)[:x]
         good = 0
         for j in index:
             if test_labels[j] == query_labels[i] and test_cameras[j] != query_cameras[i]:
@@ -50,7 +51,7 @@ def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
 def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
     mAP = 0
     for i, row in enumerate(dist):
-        index = np.argsort(row)[::-1]
+        index = np.argsort(row)
         ap, good, total = 0, 0, 0
         for j in index:
             total += 1
@@ -68,7 +69,7 @@ def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_lab
     for i, row in enumerate(dist):
         ql, qc = query_labels[i], query_cameras[i]
         s = '[%d,%d]' % (ql, qc)
-        index = np.argsort(row)[::-1]
+        index = np.argsort(row)
         for j in index:
             tl, tc = test_labels[j], test_cameras[j]
             s += '\t[%d,%d]' % (tl, tc)
