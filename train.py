@@ -31,7 +31,7 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
         epoch_loss = .0
         for i, data in enumerate(trainloader):
             net.train()
-            inputs, labels, _ = data
+            inputs, labels, _, _ = data
             if args.use_gpu:
                 inputs, labels = Variable(inputs).cuda(), Variable(labels).cuda()
             else:

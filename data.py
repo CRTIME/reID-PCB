@@ -7,13 +7,13 @@ import torch.utils.data as data
 from utils import log
 
 class Market1501(data.Dataset):
-    
+
     base_folder = 'Market-1501-v15.09.15'
     train_folder = 'test'
     train_folder = 'bounding_box_train'
     test_folder = 'bounding_box_test'
     query_folder = 'query'
-    
+
     def __init__(self, root, data_type='train',
                 transform=None, target_transform=None,
                 download=False, once=False):
@@ -22,10 +22,10 @@ class Market1501(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.once = once
-        
+
         if download:
             self.download()
-        
+
         if self.data_type == 'train':
             self.folder = os.path.join(self.root, self.base_folder, self.train_folder)
         elif self.data_type == 'test':
@@ -35,9 +35,9 @@ class Market1501(data.Dataset):
 
         self.pattern = re.compile(r'^(\-1|\d{4})_c(\d)s\d_\d{6}_\d{2}.*\.jpg$')
         self.file_list = list(filter(self.pattern.search, os.listdir(self.folder)))
-        
+
         if self.once:
-            self.load_data_at_once() 
+            self.load_data_at_once()
 
     def load_data_at_once(self):
         self.data, self.labels, self.cameras = [], [], []
@@ -49,7 +49,7 @@ class Market1501(data.Dataset):
             self.cameras.append(camera)
 
             if k % 500 == 499:
-                log('[%s_data_loading] %5d/%5d' % (self.data_type, k, total))                
+                log('[%s_data_loading] %5d/%5d' % (self.data_type, k, total))
             k += 1
 
         self.data = torch.cat(self.data, 0)
@@ -58,8 +58,8 @@ class Market1501(data.Dataset):
     def __getitem__(self, index):
         if self.once:
             return self.data[index], self.labels[index], self.cameras[index]
-        return self.load_image(self.file_list[index])        
-    
+        return self.load_image(self.file_list[index])
+
     def load_image(self, filename):
         label, camera = re.findall(self.pattern, filename)[0]
         label, camera = int(label), int(camera)
@@ -71,14 +71,14 @@ class Market1501(data.Dataset):
         if self.target_transform is not None:
             img = self.target_transform(img)
 
-        return img, label, camera
+        return img, label, camera, filename
 
     def __len__(self):
         return len(self.file_list)
-        
+
     def download(self):
         pass
-    
+
     def __repr__(self):
         fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
         return fmt_str

@@ -6,6 +6,10 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torch.nn import DataParallel
 from scipy.spatial.distance import cdist
+from sklearn.metrics import average_precision_score
+
+from PIL import Image
+import matplotlib.pyplot as plt
 
 from utils import log
 from net import FeatureExtractor
@@ -17,21 +21,21 @@ def extract_feat(args, extractor, dataloader, feat_dim):
     feat = []
     labels = []
     cameras = []
+    filenames = []
     for _, data in enumerate(dataloader):
         extractor.eval()
-        inputs, l, c = data
+        inputs, l, c, f = data
         inputs = Variable(inputs, volatile=True)
         if args.use_gpu:
             inputs = inputs.cuda()
         outputs = extractor.forward(inputs)
         feat.append(outputs)
-        labels.append(l)
-        cameras.append(c)
+        labels += list(l)
+        cameras += list(c)
+        filenames += list(f)
     feat = torch.cat(feat)
     feat.view(-1, feat_dim)
-    labels = torch.cat(labels)
-    cameras = torch.cat(cameras)
-    return feat.cpu().data.numpy(), labels.numpy(), cameras.numpy()
+    return feat.cpu().data.numpy(), labels, cameras, filenames
 
 def get_dist(query, test):
     return cdist(query, test)
@@ -63,6 +67,21 @@ def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
     mAP /= np.shape(dist)[0]
     return mAP
 
+def visualize(dist, query_files, test_files):
+    canvas = Image.new('RGB', (600, 1000), (255, 255, 255))
+    idx = np.random.randint(0, len(dist), (10))
+    rows = dist[idx]
+    q_files = query_files[idx]
+    for i, row in enumerate(rows):
+        img = Image.open(q_files[i]).resize((50, 100))
+        canvas.paste(img, (0, i*100))
+        candidates = test_files[np.argsort(row)[:10]]
+        for j, candidate in enumerate(candidates):
+            img = Image.open(candidate).resize((50, 100))
+            canvas.paste(img, (100+j*50, i*100))
+    plt.imshow(np.asarray(canvas))
+    canvas.save('visualize.png')
+
 def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_labels, test_cameras):
     print('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
     f = open('test_result.txt', 'a+')
@@ -93,7 +112,7 @@ def test(args):
     log('[ END ] Loading Query Data')
 
     log('[START] Extracting Query Features')
-    query_feat, query_labels, query_cameras = extract_feat(args, feat_extractor, queryloader, feat_dim)
+    query_feat, query_labels, query_cameras, query_files = extract_feat(args, feat_extractor, queryloader, feat_dim)
     log('[ END ] Extracting Query Features')
 
     log('[START] Loading Test Data')
@@ -102,7 +121,7 @@ def test(args):
     log('[ END ] Loading Test Data')
 
     log('[START] Extracting Test Features')
-    test_feat, test_labels, test_cameras = extract_feat(args, feat_extractor, testloader, feat_dim)
+    test_feat, test_labels, test_cameras, test_files = extract_feat(args, feat_extractor, testloader, feat_dim)
     log('[ END ] Extracting Test Features')
 
     log('[START] Calculating Distances')
@@ -115,6 +134,6 @@ def test(args):
     rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
     log('[ END ] Evaluating mAP, Rank-x')
 
-    print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_labels, test_cameras)
+    visualize(dist, query_files, test_files)
 
     return mAP, rank1, rank10
