@@ -59,7 +59,7 @@ def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
 def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
     indices = np.argsort(dist, axis=1)
     matches = (test_labels[indices] == query_labels[:, np.newaxis])
-    m, n = dist.shape
+    m, _ = dist.shape
     aps = np.zeros(m)
     is_valid_query = np.zeros(m)
     for i in range(m):
