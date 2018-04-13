@@ -35,37 +35,80 @@ def extract_feat(args, extractor, dataloader, feat_dim):
         filenames += list(f)
     feat = torch.cat(feat)
     feat.view(-1, feat_dim)
-    return feat.cpu().data.numpy(), labels, cameras, filenames
+    return feat.cpu().data.numpy(), np.array(labels), np.array(cameras), np.array(filenames)
 
 def get_dist(query, test):
     return cdist(query, test)
 
 def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
     rank_x = 0
+    total = 0
     for i, row in enumerate(dist):
         index = np.argsort(row)[:x]
-        good = 0
+        good = False
         for j in index:
             if test_labels[j] == query_labels[i] and test_cameras[j] != query_cameras[i]:
-                good += 1
-        rank_x += good / len(index)
-    rank_x /= np.shape(dist)[0]
+                good = True
+                break
+        if good:
+            rank_x += 1
+        total += 1
+    rank_x /= total
     return rank_x
 
 def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
-    mAP = 0
-    for i, row in enumerate(dist):
-        index = np.argsort(row)
-        ap, good, total = 0, 0, 0
-        for j in index:
-            total += 1
-            if test_labels[j] == query_labels[i] and test_cameras[j] != query_cameras[i]:
-                good += 1
-                ap += good / total
-        ap /= good
-        mAP += ap
-    mAP /= np.shape(dist)[0]
-    return mAP
+    indices = np.argsort(dist, axis=1)
+    matches = (test_labels[indices] == query_labels[:, np.newaxis])
+    m, n = dist.shape
+    aps = np.zeros(m)
+    is_valid_query = np.zeros(m)
+    for i in range(m):
+        valid = ((test_labels[indices[i]] != query_labels[i]) |
+                 (test_cameras[indices[i]] != query_cameras[i]))
+        y_true = matches[i, valid]
+        y_score = -dist[i][indices[i]][valid]
+        if not np.any(y_true): continue
+        is_valid_query[i] = 1
+        aps[i] = average_precision_score(y_true, y_score)
+    return float(np.sum(aps)) / np.sum(is_valid_query)
+
+class Dist(nn.Module):
+    def __init__(self):
+        super(Dist, self).__init__()
+    def forward(self, x, y):
+        n = x.size(0)
+        m = y.size(0)
+        d = x.size(1)
+        x = x.unsqueeze(1).expand(n, m, d)
+        y = y.unsqueeze(0).expand(n, m, d)
+        dist = torch.pow(x - y, 2).sum(2)
+        return dist
+
+def calc_dist(query_feat, test_feat):
+    pdist = Dist().cuda()
+    split_num = 40
+    lx = int(len(query_feat) / split_num) + 1
+    ly = int(len(test_feat) / split_num) + 1
+    dist = None
+    for i in range(split_num):
+        tmp_dist = None
+        if i * lx >= len(query_feat):
+            continue
+        x = Variable(torch.from_numpy(query_feat[i*lx:(i+1)*lx]), volatile=True).cuda()
+        for j in range(split_num):
+            if j * ly >= len(test_feat):
+                continue
+            y = Variable(torch.from_numpy(test_feat[j*ly:(j+1)*ly]), volatile=True).cuda()
+            d = pdist(x, y).cpu().data.numpy()
+            if tmp_dist is None:
+                tmp_dist = d
+            else:
+                tmp_dist = np.concatenate((tmp_dist, d), axis=1)
+        if dist is None:
+            dist = tmp_dist
+        else:
+            dist = np.concatenate([dist, tmp_dist], axis=0)
+    return dist
 
 def visualize(dist, query_files, test_files):
     canvas = Image.new('RGB', (600, 1000), (255, 255, 255))
@@ -125,7 +168,7 @@ def test(args):
     log('[ END ] Extracting Test Features')
 
     log('[START] Calculating Distances')
-    dist = get_dist(query_feat, test_feat)
+    dist = calc_dist(query_feat, test_feat)
     log('[ END ] Calculating Distances')
 
     log('[START] Evaluating mAP, Rank-x')
