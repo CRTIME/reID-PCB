@@ -125,20 +125,6 @@ def visualize(dist, query_files, test_files):
     plt.imshow(np.asarray(canvas))
     canvas.save('visualize.png')
 
-def print_result(mAP, rank1, rank10, dist, query_labels, query_cameras, test_labels, test_cameras):
-    print('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
-    f = open('test_result.txt', 'a+')
-    for i, row in enumerate(dist):
-        ql, qc = query_labels[i], query_cameras[i]
-        s = '[%d,%d]' % (ql, qc)
-        index = np.argsort(row)
-        for j in index:
-            tl, tc = test_labels[j], test_cameras[j]
-            s += '\t[%d,%d]' % (tl, tc)
-        s += '\n'
-        f.write(s)
-    f.close()
-
 def test(args):
 
     feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=args.last_conv)
@@ -177,6 +163,7 @@ def test(args):
     rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
     log('[ END ] Evaluating mAP, Rank-x')
 
+    print('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
     visualize(dist, query_files, test_files)
 
     return mAP, rank1, rank10
