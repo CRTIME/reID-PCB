@@ -113,5 +113,6 @@ def train(args):
     log('[ END ] Training')
 
     log('[START] Saving Model')
-    torch.save(get_net(args, net).cpu().state_dict(), args.model_file)
+    if (not args.distributed) or args.dist_rank == 0:
+        torch.save(get_net(args, net).cpu().state_dict(), args.model_file)
     log('[ END ] Saving Model')

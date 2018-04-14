@@ -15,7 +15,7 @@ class PCB(nn.Module):
     def forward(self, x):
         y = []
         for i in range(6):
-            y_i = x[:, :, i*6:(i+1)*6, :]
+            y_i = x[:, :, i*4:(i+1)*4, :]
             y_i = F.adaptive_avg_pool2d(y_i, (1, 1))
             y.append(y_i)
         return y
@@ -75,10 +75,10 @@ class Net(nn.Module):
     def forward(self, x):
         x = self.resnet.forward(x)
         y = self.pcb(x) if self.baseline else self.rpp(x)
-        for i, y_i in enumerate(y):
-            y_i = self.convs[i](y_i)
-            y_i = y_i.view(-1, 256)
-            y_i = self.fcs[i](y_i)
+        for i in range(6):
+            y[i] = self.convs[i](y[i])
+            y[i] = y[i].view(-1, 256)
+            y[i] = self.fcs[i](y[i])
         return y
 
 class FeatureExtractor(Net):
@@ -90,12 +90,12 @@ class FeatureExtractor(Net):
     def forward(self, x):
         x = self.resnet.forward(x)
         y = self.rpp(x)
-        for i, y_i in enumerate(y):
+        for i in range(6):
             if self.last_conv:
-                y_i = self.convs[i](y_i)
-                y_i = y_i.view(-1, 256)
+                y[i] = self.convs[i](y[i])
+                y[i] = y[i].view(-1, 256)
             else:
-                y_i = y_i.view(-1, 2048)
+                y[i] = y[i].view(-1, 2048)
         y = torch.cat(y, 1)
         return y
 
