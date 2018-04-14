@@ -23,19 +23,13 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
     for epoch in range(args.epoch):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-
-        optimizer = optimizer_40
-        if epoch >= 40:
-            optimizer = optimizer_60
-
+        optimizer = optimizer_40 if epoch >= 40 else optimizer_60
         epoch_loss = .0
         for i, data in enumerate(trainloader):
             net.train()
-            inputs, labels, _, _ = data
+            inputs, labels = Variable(data[0]), Variable(data[1])
             if args.use_gpu:
-                inputs, labels = Variable(inputs).cuda(), Variable(labels).cuda()
-            else:
-                inputs, labels = Variable(inputs), Variable(labels)
+                inputs, labels = inputs.cuda(), labels.cuda()
 
             outputs = net.forward(inputs)
             loss = criterion(outputs, labels)
@@ -45,8 +39,8 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
             optimizer.step()
 
             epoch_loss += loss.data[0]
-            if i % 20 == 19:
-                log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (args.process_name, epoch, i, epoch_loss / 20))
+            if i % 21 == 20:
+                log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (args.process_name, epoch, i, epoch_loss / 21))
                 epoch_loss = .0
 
 def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
@@ -94,7 +88,7 @@ def train(args):
         shuffle=(train_sampler is None), num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
     log('[ END ] Loading Training Data')
 
-    log('[START] Build Net')
+    log('[START] Building Net')
     net = Net()
     criterion = MyCrossEntropyLoss(args)
     if args.use_gpu:

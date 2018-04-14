@@ -40,6 +40,43 @@ def extract_feat(args, extractor, dataloader, feat_dim):
 def get_dist(query, test):
     return cdist(query, test)
 
+def calc_dist(query_feat, test_feat):
+    class Dist(nn.Module):
+        def __init__(self):
+            super(Dist, self).__init__()
+        def forward(self, x, y):
+            n = x.size(0)
+            m = y.size(0)
+            d = x.size(1)
+            x = x.unsqueeze(1).expand(n, m, d)
+            y = y.unsqueeze(0).expand(n, m, d)
+            dist = torch.pow(x - y, 2).sum(2)
+            return dist
+    pdist = Dist().cuda()
+    split_num = 40
+    lx = int(len(query_feat) / split_num) + 1
+    ly = int(len(test_feat) / split_num) + 1
+    dist = None
+    for i in range(split_num):
+        tmp_dist = None
+        if i * lx >= len(query_feat):
+            continue
+        x = Variable(torch.from_numpy(query_feat[i*lx:(i+1)*lx]), volatile=True).cuda()
+        for j in range(split_num):
+            if j * ly >= len(test_feat):
+                continue
+            y = Variable(torch.from_numpy(test_feat[j*ly:(j+1)*ly]), volatile=True).cuda()
+            d = pdist(x, y).cpu().data.numpy()
+            if tmp_dist is None:
+                tmp_dist = d
+            else:
+                tmp_dist = np.concatenate((tmp_dist, d), axis=1)
+        if dist is None:
+            dist = tmp_dist
+        else:
+            dist = np.concatenate([dist, tmp_dist], axis=0)
+    return dist
+
 def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
     rank_x = 0
     total = 0
@@ -71,44 +108,6 @@ def get_map(dist, query_labels, query_cameras, test_labels, test_cameras):
         is_valid_query[i] = 1
         aps[i] = average_precision_score(y_true, y_score)
     return float(np.sum(aps)) / np.sum(is_valid_query)
-
-class Dist(nn.Module):
-    def __init__(self):
-        super(Dist, self).__init__()
-    def forward(self, x, y):
-        n = x.size(0)
-        m = y.size(0)
-        d = x.size(1)
-        x = x.unsqueeze(1).expand(n, m, d)
-        y = y.unsqueeze(0).expand(n, m, d)
-        dist = torch.pow(x - y, 2).sum(2)
-        return dist
-
-def calc_dist(query_feat, test_feat):
-    pdist = Dist().cuda()
-    split_num = 40
-    lx = int(len(query_feat) / split_num) + 1
-    ly = int(len(test_feat) / split_num) + 1
-    dist = None
-    for i in range(split_num):
-        tmp_dist = None
-        if i * lx >= len(query_feat):
-            continue
-        x = Variable(torch.from_numpy(query_feat[i*lx:(i+1)*lx]), volatile=True).cuda()
-        for j in range(split_num):
-            if j * ly >= len(test_feat):
-                continue
-            y = Variable(torch.from_numpy(test_feat[j*ly:(j+1)*ly]), volatile=True).cuda()
-            d = pdist(x, y).cpu().data.numpy()
-            if tmp_dist is None:
-                tmp_dist = d
-            else:
-                tmp_dist = np.concatenate((tmp_dist, d), axis=1)
-        if dist is None:
-            dist = tmp_dist
-        else:
-            dist = np.concatenate([dist, tmp_dist], axis=0)
-    return dist
 
 def visualize(dist, query_files, test_files):
     canvas = Image.new('RGB', (600, 1000), (255, 255, 255))

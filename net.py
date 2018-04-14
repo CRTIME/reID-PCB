@@ -10,27 +10,57 @@ import torch.utils.model_zoo as model_zoo
 import torch.nn.init as init
 
 class PCB(nn.Module):
-    def __init__(self):
+    """Part-based Convolutional Baseline (PCB) Layer
+
+    Average divide feature map into p (p = 6) parts.
+    """
+    def __init__(self, p=6):
+        """
+        Args:
+            p: The numer of parts.
+        """
         super(PCB, self).__init__()
+        self.p = p
+
     def forward(self, x):
+        assert x.size()[2] % self.p == 0
+        h = int(x.size()[2] / self.p)
         y = []
-        for i in range(6):
-            y_i = x[:, :, i*4:(i+1)*4, :]
+        for i in range(self.p):
+            y_i = x[:, :, i*h:(i+1)*h, :]
             y_i = F.adaptive_avg_pool2d(y_i, (1, 1))
             y.append(y_i)
         return y
 
 class RPP(nn.Module):
-    def __init__(self):
+    """Refined Part Pooling (RPP) Layer
+
+    Relocating outliers by calculating the probability of each column vector.
+
+    Attributes:
+        W: The trainable weight matrix of the part classifier.
+           Its size is [C, p], where C is the length of column vector,
+           and p is the number of parts.
+    """
+    def __init__(self, vector_length=2048, p=6):
+        """
+        Args:
+            vector_length: The length of a column vector (or the number of channels).
+            p: The number of parts.
+        """
         super(RPP, self).__init__()
-        # self.W.size(): [2048, 6]
-        W = torch.zeros(2048, 6)
+        self.vector_length = vector_length
+        self.p = p
+        W = torch.zeros(vector_length, p)
         self.W = nn.Parameter(W)
 
     def forward(self, x):
         """
-            input: x.size():  [N, C, H, W]
-            output: y.size(): [N, C, 1, 1] x 6
+        Args:
+            x: Feature tensor, whose size is [N, C, H, W]
+
+        Returns:
+            y: Feature vectors. [N, C, 1, 1] x p
         """
         N, C, H, W = x.size()
         vectors = x.permute(0, 2, 3, 1).contiguous().view(-1, C)
@@ -47,6 +77,15 @@ class RPP(nn.Module):
         return y
 
 class Net(nn.Module):
+    """Part-based Model
+
+    Attributes:
+        resnet: ResNet-50, the backbone network.
+        pcb: Part-based convolutional baseline layer.
+        rpp: Refined part pooling layer.
+        convs: Some 1x1 convolution layers to reduces the dimension of column vector.
+        fcs: Some full-connected layers to classification.
+    """
     def __init__(self, out_size=1501):
         super(Net, self).__init__()
 
