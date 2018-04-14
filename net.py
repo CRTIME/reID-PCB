@@ -14,9 +14,7 @@ class Net(nn.Module):
         super(Net, self).__init__()
 
         resnet = resnet50(pretrained=True)
-        backbone_model = nn.Sequential(*list(resnet.children())[:-2])
-
-        self.resnet = backbone_model
+        self.resnet = nn.Sequential(*list(resnet.children())[:-2])
 
         init_val = [torch.zeros(24, 8) for _ in range(6)]
         for i in range(6):
@@ -41,7 +39,8 @@ class Net(nn.Module):
         x = self.resnet.forward(x)
         xs = [None for _ in range(6)]
         for i in range(6):
-            x_i = torch.mul(x, self.Ws[i])
+            w = F.softmax(self.Ws[i]) * 32
+            x_i = torch.mul(x, w)
             x_i = self.avgpool(x_i)
             x_i = self.conv1(x_i)
             x_i = x_i.view(-1, 256)
@@ -59,7 +58,8 @@ class FeatureExtractor(Net):
         x = self.resnet.forward(x)
         xs = [None for _ in range(6)]
         for i in range(6):
-            x_i = torch.mul(x, self.Ws[i])
+            w = F.softmax(self.Ws[i]) * 32
+            x_i = torch.mul(x, w)
             x_i = self.avgpool(x_i)
             if self.last_conv:
                 x_i = self.conv1(x_i)
