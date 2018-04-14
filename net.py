@@ -33,15 +33,15 @@ class RPP(nn.Module):
             output: y.size(): [N, C, 1, 1] x 6
         """
         N, C, H, W = x.size()
-        vectors = x.permute(0, 2, 3, 1).view(-1, C)
-        masks = F.softmax(torch.mm(vectors, self.W), dim=1).view(N, H, W, 6).permute(3, 0, 1, 2)
+        vectors = x.permute(0, 2, 3, 1).contiguous().view(-1, C)
+        masks = F.softmax(torch.mm(vectors, self.W), dim=1).view(N, H, W, 6).permute(3, 0, 1, 2).contiguous()
         y = []
         for i in range(6):
             # mask.size(): N, H, W
             mask = masks[i, :, :, :]
-            x_i = x.permute(1, 0, 2, 3)
+            x_i = x.permute(1, 0, 2, 3).contiguous()
             y_i = torch.mul(x_i.view(C, -1), mask.view(-1))
-            y_i = y_i.view(C, N, H, W).permute(1, 0, 2, 3)
+            y_i = y_i.view(C, N, H, W).permute(1, 0, 2, 3).contiguous()
             y_i = F.adaptive_avg_pool2d(y_i, (1, 1))
             y.append(y_i)
         return y
@@ -70,7 +70,7 @@ class Net(nn.Module):
             init.constant(fc.bias, 0)
             self.fcs.append(fc)
 
-        self.baseline = False
+        self.baseline = True
 
     def forward(self, x):
         x = self.resnet.forward(x)
@@ -80,6 +80,9 @@ class Net(nn.Module):
             y[i] = y[i].view(-1, 256)
             y[i] = self.fcs[i](y[i])
         return y
+
+    def set_stage(self, stage):
+        self.baseline = stage == 1
 
 class FeatureExtractor(Net):
     def __init__(self, state_path, last_conv=True):

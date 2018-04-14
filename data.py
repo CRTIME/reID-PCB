@@ -63,7 +63,8 @@ class Market1501(data.Dataset):
     def load_image(self, filename):
         label, camera = re.findall(self.pattern, filename)[0]
         label, camera = int(label), int(camera)
-        img = Image.open(os.path.join(self.folder, filename))
+        img_filename = os.path.join(self.folder, filename)
+        img = Image.open(img_filename)
         img.load()
 
         if self.transform is not None:
@@ -71,7 +72,7 @@ class Market1501(data.Dataset):
         if self.target_transform is not None:
             img = self.target_transform(img)
 
-        return img, label, camera, filename
+        return img, label, camera, img_filename
 
     def __len__(self):
         return len(self.file_list)
