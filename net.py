@@ -57,7 +57,7 @@ class RPP(nn.Module):
     def forward(self, x):
         """
         Args:
-            x: Feature tensor, whose size is [N, C, H, W]
+            x: The feature tensors, whose size is [N, C, H, W]
 
         Returns:
             y: Feature vectors. [N, C, 1, 1] x p
@@ -87,6 +87,10 @@ class Net(nn.Module):
         fcs: Some full-connected layers to classification.
     """
     def __init__(self, out_size=1501):
+        """
+        Args:
+            out_size: The number of training labels.
+        """
         super(Net, self).__init__()
 
         resnet = resnet50(pretrained=True)
@@ -112,6 +116,14 @@ class Net(nn.Module):
         self.baseline = True
 
     def forward(self, x):
+        """
+        Args:
+            x: Image tensors, whose size is [N, 3, 768, 256],
+                where N is the batch size.
+
+        Returns:
+            y: Feature vectors. [N, C, 1, 1] x p
+        """
         x = self.resnet.forward(x)
         y = self.pcb(x) if self.baseline else self.rpp(x)
         for i in range(6):
@@ -121,15 +133,37 @@ class Net(nn.Module):
         return y
 
     def set_stage(self, stage):
+        """Setting training stage.
+
+        Args:
+            stage: 1 if using PCB, otherwise using RPP.
+        """
         self.baseline = stage == 1
 
 class FeatureExtractor(Net):
+    """Feature extractor
+    """
     def __init__(self, state_path, last_conv=True):
+        """
+        Args:
+            state_path: Path to the state dict file.
+            last_conv: Whether contains the last convolution layer.
+        """
         super(FeatureExtractor, self).__init__()
         self.last_conv = last_conv
         self.load_state_dict(torch.load(state_path), strict=False)
 
     def forward(self, x):
+        """
+        Args:
+            x: Image tensors, whose size is [N, 3, 768, 256],
+                where N is the batch size.
+
+        Returns:
+            y: Feature vector, whose size is p x 2048 if not containing
+                the last convolution layer, otherwise p x 256,
+                where p is the number of parts.
+        """
         x = self.resnet.forward(x)
         y = self.rpp(x)
         for i in range(6):
@@ -142,6 +176,8 @@ class FeatureExtractor(Net):
         return y
 
 class MyCrossEntropyLoss(nn.CrossEntropyLoss):
+    """Cross Entropy Loss for multiple output
+    """
     def __init__(self, args):
         super(MyCrossEntropyLoss, self).__init__()
         self.use_gpu = args.use_gpu
