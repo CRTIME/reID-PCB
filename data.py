@@ -1,7 +1,7 @@
 import os
 import re
-import torch
 from PIL import Image
+import torch
 import torch.utils.data as data
 
 from utils import log

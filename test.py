@@ -9,7 +9,6 @@ from scipy.spatial.distance import cdist
 from sklearn.metrics import average_precision_score
 
 from PIL import Image
-import matplotlib.pyplot as plt
 
 from utils import log
 from net import FeatureExtractor
@@ -56,9 +55,9 @@ def calc_dist(query_feat, test_feat):
     split_num = 40
     lx = int(len(query_feat) / split_num) + 1
     ly = int(len(test_feat) / split_num) + 1
-    dist = None
+    dist = []
     for i in range(split_num):
-        tmp_dist = None
+        tmp_dist = []
         if i * lx >= len(query_feat):
             continue
         x = Variable(torch.from_numpy(query_feat[i*lx:(i+1)*lx]), volatile=True).cuda()
@@ -67,23 +66,25 @@ def calc_dist(query_feat, test_feat):
                 continue
             y = Variable(torch.from_numpy(test_feat[j*ly:(j+1)*ly]), volatile=True).cuda()
             d = pdist(x, y).cpu().data.numpy()
-            if tmp_dist is None:
-                tmp_dist = d
-            else:
-                tmp_dist = np.concatenate((tmp_dist, d), axis=1)
-        if dist is None:
-            dist = tmp_dist
-        else:
-            dist = np.concatenate([dist, tmp_dist], axis=0)
+            tmp_dist.append(d)
+        tmp_dist = np.concatenate(tmp_dist, axis=1)
+        dist.append(tmp_dist)
+    dist = np.concatenate(dist, axis=0)
     return dist
 
 def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
     rank_x = 0
     total = 0
     for i, row in enumerate(dist):
-        index = np.argsort(row)[:x]
+        index = np.argsort(row)
         good = False
+        vaild_num = 0
         for j in index:
+            if test_labels[j] == query_labels[i] and test_cameras[j] == query_cameras[i]:
+                continue
+            vaild_num += 1
+            if vaild_num > x:
+                break
             if test_labels[j] == query_labels[i] and test_cameras[j] != query_cameras[i]:
                 good = True
                 break
@@ -121,8 +122,12 @@ def visualize(dist, query_files, test_files):
         for j, candidate in enumerate(candidates):
             img = Image.open(candidate).resize((50, 100))
             canvas.paste(img, (100+j*50, i*100))
-    plt.imshow(np.asarray(canvas))
     canvas.save('visualize.png')
+    try:
+        import matplotlib.pyplot as plt
+        plt.imshow(np.asarray(canvas))
+    except:
+        log('[NOTE] Failed to show image by matplotlib.')
 
 def test(args):
 
@@ -131,29 +136,25 @@ def test(args):
         feat_extractor = DataParallel(feat_extractor)
         feat_extractor.cuda()
 
-    feat_dim = 2048
-    if args.last_conv: feat_dim = 256
+    feat_dim = 256 if args.last_conv else 2048
 
-    log('[START] Loading Query Data')
+    log('[START] Loading Data')
     queryset = Market1501(args.dataset, data_type='query', transform=transform, once=args.load_once)
+    testset = Market1501(args.dataset, data_type='test', transform=transform, once=args.load_once)
     queryloader = DataLoader(queryset, batch_size=args.batch_size, num_workers=args.num_workers)
+    testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
     log('[ END ] Loading Query Data')
 
     log('[START] Extracting Query Features')
     query_feat, query_labels, query_cameras, query_files = extract_feat(args, feat_extractor, queryloader, feat_dim)
     log('[ END ] Extracting Query Features')
 
-    log('[START] Loading Test Data')
-    testset = Market1501(args.dataset, data_type='test', transform=transform, once=args.load_once)
-    testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
-    log('[ END ] Loading Test Data')
-
     log('[START] Extracting Test Features')
     test_feat, test_labels, test_cameras, test_files = extract_feat(args, feat_extractor, testloader, feat_dim)
     log('[ END ] Extracting Test Features')
 
     log('[START] Calculating Distances')
-    dist = calc_dist(query_feat, test_feat)
+    dist = calc_dist(query_feat, test_feat) if args.use_gpu else get_dist(query_feat, test_feat)
     log('[ END ] Calculating Distances')
 
     log('[START] Evaluating mAP, Rank-x')
@@ -162,7 +163,7 @@ def test(args):
     rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
     log('[ END ] Evaluating mAP, Rank-x')
 
-    print('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
+    log('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))
     visualize(dist, query_files, test_files)
 
     return mAP, rank1, rank10

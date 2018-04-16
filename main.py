@@ -7,8 +7,8 @@ from test import test
 def main(args):
     if args.stage == 'all' or args.stage == 'train':
         train(args)
-    if args.stage == 'all' or args.stage == 'test':    
-        test(args)  
+    if args.stage == 'all' or args.stage == 'test':
+        test(args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Person Re-Identification Reproduce')
@@ -27,7 +27,7 @@ if __name__ == '__main__':
     args.use_gpu = args.use_gpu == 1
     args.last_conv = args.last_conv == 1
     args.load_once = args.load_once == 1
-    args.distributed = args.world_size > 1    
+    args.distributed = args.world_size > 1
     args.home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
     args.dataset = os.path.join(args.home, 'datasets')
     args.model_file = os.path.join(args.home, 'models', args.params_filename)

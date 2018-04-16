@@ -15,9 +15,7 @@ from net import Net
 from net import MyCrossEntropyLoss
 
 def get_net(args, net):
-    if args.use_gpu:
-        return net.module
-    return net
+    return net.module if args.use_gpu else net
 
 def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60):
     for epoch in range(args.epoch):

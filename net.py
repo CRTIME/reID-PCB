@@ -80,29 +80,31 @@ class Net(nn.Module):
     """Part-based Model
 
     Attributes:
+        p: The number of parts.
         resnet: ResNet-50, the backbone network.
         pcb: Part-based convolutional baseline layer.
         rpp: Refined part pooling layer.
         convs: Some 1x1 convolution layers to reduces the dimension of column vector.
         fcs: Some full-connected layers to classification.
     """
-    def __init__(self, out_size=1501):
+    def __init__(self, out_size=1501, p=6):
         """
         Args:
             out_size: The number of training labels.
         """
         super(Net, self).__init__()
+        self.p = p
 
         resnet = resnet50(pretrained=True)
         self.resnet = nn.Sequential(*list(resnet.children())[:-2])
 
-        self.pcb = PCB()
-        self.rpp = RPP()
+        self.pcb = PCB(p=p)
+        self.rpp = RPP(vector_length=2048, p=p)
         init.normal(self.rpp.W, std=0.001)
 
         self.convs = nn.ModuleList()
         self.fcs = nn.ModuleList()
-        for _ in range(6):
+        for _ in range(p):
             self.convs.append(nn.Sequential(
                 nn.Conv2d(2048, 256, 1),
                 nn.BatchNorm2d(256),
@@ -126,7 +128,7 @@ class Net(nn.Module):
         """
         x = self.resnet.forward(x)
         y = self.pcb(x) if self.baseline else self.rpp(x)
-        for i in range(6):
+        for i in range(self.p):
             y[i] = self.convs[i](y[i])
             y[i] = y[i].view(-1, 256)
             y[i] = self.fcs[i](y[i])
@@ -176,7 +178,7 @@ class FeatureExtractor(Net):
         return y
 
 class MyCrossEntropyLoss(nn.CrossEntropyLoss):
-    """Cross Entropy Loss for multiple output
+    """Cross Entropy Loss for multiple output.
     """
     def __init__(self, args):
         super(MyCrossEntropyLoss, self).__init__()
