@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import torch.distributed as dist
 from torch.nn import DataParallel
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
 
 from utils import log
@@ -17,7 +18,8 @@ from net import MyCrossEntropyLoss
 def get_net(args, net):
     return net.module if args.use_gpu else net
 
-def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60):
+def base_train(args, net, criterion, trainloader, train_sampler,
+               optimizer_40, optimizer_60):
     for epoch in range(args.epoch):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -38,7 +40,8 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
 
             epoch_loss += loss.data[0]
             if i % 21 == 20:
-                log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (args.process_name, epoch, i, epoch_loss / 21))
+                log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' %
+                    (args.process_name, epoch, i, epoch_loss / 21))
                 epoch_loss = .0
     return net
 
@@ -54,7 +57,8 @@ def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
         { 'params': get_net(args, net).fcs.parameters() }
     ], lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'standard_pcb_train'
-    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler,
+                     optimizer_40, optimizer_60)
     return net
 
 def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
@@ -65,17 +69,23 @@ def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
             net = DistributedDataParallel(net)
         else:
             net = DataParallel(net)
-    optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+    optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1,
+                             momentum=0.9, weight_decay=0.0005)
+    optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01,
+                             momentum=0.9, weight_decay=0.0005)
     args.process_name = 'refined_pcb_train'
-    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler,
+                     optimizer_40, optimizer_60)
     return net
 
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.01,
+                             momentum=0.9, weight_decay=0.0005)
+    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.001,
+                             momentum=0.9, weight_decay=0.0005)
     args.process_name = 'overall_fine_tune_train'
-    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler,
+                     optimizer_40, optimizer_60)
     return net
 
 def train(args):
@@ -85,13 +95,18 @@ def train(args):
             world_size=args.world_size, rank=args.dist_rank)
 
     log('[START] Loading Training Data')
-    trainset = Market1501(root=args.dataset, data_type='train', transform=transform, once=args.load_once)
+    trainset = Market1501(root=args.dataset, data_type='train',
+                          transform=transform, once=args.load_once)
     if args.distributed:
         train_sampler = DistributedSampler(trainset)
     else:
         train_sampler = None
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
-        shuffle=(train_sampler is None), num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
+    trainloader = DataLoader(trainset,
+                             batch_size=args.batch_size,
+                             shuffle=(train_sampler is None),
+                             num_workers=args.num_workers,
+                             pin_memory=True,
+                             sampler=train_sampler)
     log('[ END ] Loading Training Data')
 
     log('[START] Building Net')
@@ -109,13 +124,17 @@ def train(args):
     log('[START] Training')
     net = standard_pcb_train(args, net, criterion, trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_pcb' % args.model_file)
+        torch.save(get_net(args, net).cpu().state_dict(),
+                   '%s.checkpoint_pcb' % args.model_file)
 
     net = refined_pcb_train(args, net, criterion, trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_rpp' % args.model_file)
+        torch.save(get_net(args, net).cpu().state_dict(),
+                   '%s.checkpoint_rpp' % args.model_file)
 
-    net = overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
+    net = overall_fine_tune_train(args, net, criterion,
+                                  trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_fnl' % args.model_file)
+        torch.save(get_net(args, net).cpu().state_dict(),
+                   '%s.checkpoint_fnl' % args.model_file)
     log('[ END ] Training')
