@@ -40,9 +40,9 @@ def base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, o
             if i % 21 == 20:
                 log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' % (args.process_name, epoch, i, epoch_loss / 21))
                 epoch_loss = .0
+    return net
 
 def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
-    get_net(args, net).set_stage(1)
     optimizer_40 = optim.SGD([
         { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.01 },
         { 'params': get_net(args, net).convs.parameters() },
@@ -54,21 +54,27 @@ def standard_pcb_train(args, net, criterion, trainloader, train_sampler):
         { 'params': get_net(args, net).fcs.parameters() }
     ], lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'standard_pcb_train'
-    base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    return net
 
 def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
-    get_net(args, net).set_stage(2)
-    optimizer_40 = optim.SGD(get_net(args, net).rpp.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).rpp.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+    net = get_net(args, net).convert_to_rpp()
+    if args.use_gpu:
+        net = net.cpu().cuda()
+        if args.distributed:
+            net = DistributedDataParallel(net)
+    optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
+    optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'refined_pcb_train'
-    base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    return net
 
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
-    get_net(args, net).set_stage(3)
-    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'overall_fine_tune_train'
-    base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    net = base_train(args, net, criterion, trainloader, train_sampler, optimizer_40, optimizer_60)
+    return net
 
 def train(args):
 
@@ -99,9 +105,9 @@ def train(args):
     log('[ END ] Building Net')
 
     log('[START] Training')
-    standard_pcb_train(args, net, criterion, trainloader, train_sampler)
-    refined_pcb_train(args, net, criterion, trainloader, train_sampler)
-    overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
+    net = standard_pcb_train(args, net, criterion, trainloader, train_sampler)
+    net = refined_pcb_train(args, net, criterion, trainloader, train_sampler)
+    net = overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
     log('[ END ] Training')
 
     log('[START] Saving Model')

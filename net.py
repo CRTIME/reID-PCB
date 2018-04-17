@@ -51,8 +51,9 @@ class RPP(nn.Module):
         super(RPP, self).__init__()
         self.vector_length = vector_length
         self.p = p
-        W = torch.zeros(vector_length, p)
-        self.W = nn.Parameter(W)
+
+        self.classifier = nn.Linear(vector_length, p)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         """
@@ -64,7 +65,8 @@ class RPP(nn.Module):
         """
         N, C, H, W = x.size()
         vectors = x.permute(0, 2, 3, 1).contiguous().view(-1, C)
-        masks = F.softmax(torch.mm(vectors, self.W), dim=1).view(N, H, W, 6).permute(3, 0, 1, 2).contiguous()
+        probabilities = self.softmax(self.classifier(vectors))
+        masks = probabilities.view(N, H, W, self.p).permute(3, 0, 1, 2).contiguous()
         y = []
         for i in range(6):
             # mask.size(): N, H, W
@@ -82,8 +84,8 @@ class Net(nn.Module):
     Attributes:
         p: The number of parts.
         resnet: ResNet-50, the backbone network.
-        pcb: Part-based convolutional baseline layer.
-        rpp: Refined part pooling layer.
+        pool: Part-based convolutional baseline (PCB) layer or
+              Refined part pooling (RPP) layer.
         convs: Some 1x1 convolution layers to reduces the dimension of column vector.
         fcs: Some full-connected layers to classification.
     """
@@ -98,9 +100,7 @@ class Net(nn.Module):
         resnet = resnet50(pretrained=True)
         self.resnet = nn.Sequential(*list(resnet.children())[:-2])
 
-        self.pcb = PCB(p=p)
-        self.rpp = RPP(vector_length=2048, p=p)
-        init.normal(self.rpp.W, std=0.001)
+        self.pool = PCB(p=p)
 
         self.convs = nn.ModuleList()
         self.fcs = nn.ModuleList()
@@ -115,8 +115,6 @@ class Net(nn.Module):
             init.constant(fc.bias, 0)
             self.fcs.append(fc)
 
-        self.baseline = True
-
     def forward(self, x):
         """
         Args:
@@ -127,20 +125,18 @@ class Net(nn.Module):
             y: Feature vectors. [N, C, 1, 1] x p
         """
         x = self.resnet.forward(x)
-        y = self.pcb(x) if self.baseline else self.rpp(x)
+        y = self.pool(x)
         for i in range(self.p):
             y[i] = self.convs[i](y[i])
             y[i] = y[i].view(-1, 256)
             y[i] = self.fcs[i](y[i])
         return y
 
-    def set_stage(self, stage):
-        """Setting training stage.
-
-        Args:
-            stage: 1 if using PCB, otherwise using RPP.
-        """
-        self.baseline = stage == 1
+    def convert_to_rpp(self):
+        self.pool = RPP(vector_length=2048, p=self.p)
+        init.normal(self.pool.classifier.weight, std=0.01)
+        init.constant(self.pool.classifier.bias, 0)
+        return self
 
 class FeatureExtractor(Net):
     """Feature extractor
