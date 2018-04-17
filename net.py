@@ -65,8 +65,8 @@ class RPP(nn.Module):
         """
         N, C, H, W = x.size()
         vectors = x.permute(0, 2, 3, 1).contiguous().view(-1, C)
-        probabilities = self.softmax(self.classifier(vectors))
-        masks = probabilities.view(N, H, W, self.p).permute(3, 0, 1, 2).contiguous()
+        prob = self.softmax(self.classifier(vectors))
+        masks = prob.view(N, H, W, self.p).permute(3, 0, 1, 2).contiguous()
         y = []
         for i in range(6):
             # mask.size(): N, H, W

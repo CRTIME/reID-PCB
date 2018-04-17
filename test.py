@@ -34,7 +34,8 @@ def extract_feat(args, extractor, dataloader, feat_dim):
         filenames += list(f)
     feat = torch.cat(feat)
     feat.view(-1, feat_dim)
-    return feat.cpu().data.numpy(), np.array(labels), np.array(cameras), np.array(filenames)
+    return (feat.cpu().data.numpy(), np.array(labels),
+           np.array(cameras), np.array(filenames))
 
 def get_dist(query, test):
     return cdist(query, test)
@@ -60,11 +61,13 @@ def calc_dist(query_feat, test_feat):
         tmp_dist = []
         if i * lx >= len(query_feat):
             continue
-        x = Variable(torch.from_numpy(query_feat[i*lx:(i+1)*lx]), volatile=True).cuda()
+        x = torch.from_numpy(query_feat[i*lx:(i+1)*lx])
+        x = Variable(x, volatile=True).cuda()
         for j in range(split_num):
             if j * ly >= len(test_feat):
                 continue
-            y = Variable(torch.from_numpy(test_feat[j*ly:(j+1)*ly]), volatile=True).cuda()
+            y = torch.from_numpy(test_feat[j*ly:(j+1)*ly])
+            y = Variable(y, volatile=True).cuda()
             d = pdist(x, y).cpu().data.numpy()
             tmp_dist.append(d)
         tmp_dist = np.concatenate(tmp_dist, axis=1)
@@ -80,12 +83,14 @@ def get_rank_x(x, dist, query_labels, query_cameras, test_labels, test_cameras):
         good = False
         vaild_num = 0
         for j in index:
-            if test_labels[j] == query_labels[i] and test_cameras[j] == query_cameras[i]:
+            if (test_labels[j] == query_labels[i]
+                    and test_cameras[j] == query_cameras[i]):
                 continue
             vaild_num += 1
             if vaild_num > x:
                 break
-            if test_labels[j] == query_labels[i] and test_cameras[j] != query_cameras[i]:
+            if (test_labels[j] == query_labels[i]
+                    and test_cameras[j] != query_cameras[i]):
                 good = True
                 break
         if good:
@@ -131,7 +136,8 @@ def visualize(dist, query_files, test_files):
 
 def test(args):
 
-    feat_extractor = FeatureExtractor(state_path=args.model_file, last_conv=args.last_conv)
+    feat_extractor = FeatureExtractor(state_path=args.model_file,
+                                      last_conv=args.last_conv)
     if args.use_gpu:
         feat_extractor = DataParallel(feat_extractor)
         feat_extractor.cuda()
@@ -139,28 +145,41 @@ def test(args):
     feat_dim = 256 if args.last_conv else 2048
 
     log('[START] Loading Data')
-    queryset = Market1501(args.dataset, data_type='query', transform=transform, once=args.load_once)
-    testset = Market1501(args.dataset, data_type='test', transform=transform, once=args.load_once)
-    queryloader = DataLoader(queryset, batch_size=args.batch_size, num_workers=args.num_workers)
-    testloader = DataLoader(testset, batch_size=args.batch_size, num_workers=args.num_workers)
+    queryset = Market1501(args.dataset, data_type='query',
+                          transform=transform, once=args.load_once)
+    testset = Market1501(args.dataset, data_type='test',
+                         transform=transform, once=args.load_once)
+    queryloader = DataLoader(queryset, batch_size=args.batch_size,
+                             num_workers=args.num_workers)
+    testloader = DataLoader(testset, batch_size=args.batch_size,
+                            num_workers=args.num_workers)
     log('[ END ] Loading Query Data')
 
     log('[START] Extracting Query Features')
-    query_feat, query_labels, query_cameras, query_files = extract_feat(args, feat_extractor, queryloader, feat_dim)
+    query_feat, query_labels, query_cameras, query_files =
+        extract_feat(args, feat_extractor, queryloader, feat_dim)
     log('[ END ] Extracting Query Features')
 
     log('[START] Extracting Test Features')
-    test_feat, test_labels, test_cameras, test_files = extract_feat(args, feat_extractor, testloader, feat_dim)
+    test_feat, test_labels, test_cameras, test_files =
+        extract_feat(args, feat_extractor, testloader, feat_dim)
     log('[ END ] Extracting Test Features')
 
     log('[START] Calculating Distances')
-    dist = calc_dist(query_feat, test_feat) if args.use_gpu else get_dist(query_feat, test_feat)
+    dist = None
+    if args.use_gpu:
+        dist = calc_dist(query_feat, test_feat)
+    else:
+        dist = get_dist(query_feat, test_feat)
     log('[ END ] Calculating Distances')
 
     log('[START] Evaluating mAP, Rank-x')
-    mAP = get_map(dist, query_labels, query_cameras, test_labels, test_cameras)
-    rank1 = get_rank_x(1, dist, query_labels, query_cameras, test_labels, test_cameras)
-    rank10 = get_rank_x(10, dist, query_labels, query_cameras, test_labels, test_cameras)
+    mAP = get_map(dist, query_labels, query_cameras,
+                  test_labels, test_cameras)
+    rank1 = get_rank_x(1, dist, query_labels, query_cameras,
+                       test_labels, test_cameras)
+    rank10 = get_rank_x(10, dist, query_labels, query_cameras,
+                        test_labels, test_cameras)
     log('[ END ] Evaluating mAP, Rank-x')
 
     log('mAP: %f\trank-1: %f\trank-10: %f' % (mAP, rank1, rank10))

@@ -27,11 +27,14 @@ class Market1501(data.Dataset):
             self.download()
 
         if self.data_type == 'train':
-            self.folder = os.path.join(self.root, self.base_folder, self.train_folder)
+            self.folder =
+                os.path.join(self.root, self.base_folder, self.train_folder)
         elif self.data_type == 'test':
-            self.folder = os.path.join(self.root, self.base_folder, self.test_folder)
+            self.folder =
+                os.path.join(self.root, self.base_folder, self.test_folder)
         else:
-            self.folder = os.path.join(self.root, self.base_folder, self.query_folder)
+            self.folder =
+                os.path.join(self.root, self.base_folder, self.query_folder)
 
         self.pattern = re.compile(r'^(\-1|\d{4})_c(\d)s\d_\d{6}_\d{2}.*\.jpg$')
         self.file_list = list(filter(self.pattern.search, os.listdir(self.folder)))
