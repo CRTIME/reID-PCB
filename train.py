@@ -63,6 +63,8 @@ def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
         net = net.cpu().cuda()
         if args.distributed:
             net = DistributedDataParallel(net)
+        else:
+            net = DataParallel(net)
     optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005)
     optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'refined_pcb_train'
@@ -106,11 +108,14 @@ def train(args):
 
     log('[START] Training')
     net = standard_pcb_train(args, net, criterion, trainloader, train_sampler)
-    net = refined_pcb_train(args, net, criterion, trainloader, train_sampler)
-    net = overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
-    log('[ END ] Training')
-
-    log('[START] Saving Model')
     if (not args.distributed) or args.dist_rank == 0:
-        torch.save(get_net(args, net).cpu().state_dict(), args.model_file)
-    log('[ END ] Saving Model')
+        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_pcb' % args.model_file)
+
+    net = refined_pcb_train(args, net, criterion, trainloader, train_sampler)
+    if (not args.distributed) or args.dist_rank == 0:
+        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_rpp' % args.model_file)
+
+    net = overall_fine_tune_train(args, net, criterion, trainloader, train_sampler)
+    if (not args.distributed) or args.dist_rank == 0:
+        torch.save(get_net(args, net).cpu().state_dict(), '%s.checkpoint_fnl' % args.model_file)
+    log('[ END ] Training')
