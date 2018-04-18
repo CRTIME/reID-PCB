@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel
 
 from utils import log
+from utils import save_model
 from config import transform
 from data import Market1501
 from utils import get_time
@@ -79,10 +80,18 @@ def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
     return net
 
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD(get_net(args, net).parameters(), lr=0.1,
-                             momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).parameters(), lr=0.01,
-                             momentum=0.9, weight_decay=0.0005)
+    optimizer_40 = optim.SGD([
+        { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.01 },
+        { 'params': get_net(args, net).convs.parameters() },
+        { 'params': get_net(args, net).fcs.parameters() },
+        { 'params': get_net(args, net).pool.parameters() }
+    ], lr=0.1, momentum=0.9, weight_decay=0.0005)
+    optimizer_60 = optim.SGD([
+        { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.001 },
+        { 'params': get_net(args, net).convs.parameters() },
+        { 'params': get_net(args, net).fcs.parameters() },
+        { 'params': get_net(args, net).pool.parameters() }
+    ], lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'overall_fine_tune_train'
     net = base_train(args, net, criterion, trainloader, train_sampler,
                      optimizer_40, optimizer_60)
@@ -110,7 +119,7 @@ def train(args):
     log('[ END ] Loading Training Data')
 
     log('[START] Building Net')
-    net = Net()
+    net = Net(rpp_std=args.rpp_std, conv_std=args.conv_std)
     criterion = MyCrossEntropyLoss(args)
     if args.use_gpu:
         net = net.cuda()
@@ -124,17 +133,14 @@ def train(args):
     log('[START] Training')
     net = standard_pcb_train(args, net, criterion, trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        filename = '%s.checkpoint_pcb' % args.model_file
-        torch.save(get_net(args, net).cpu().state_dict(), filename)
+        save_model(net, '%s.checkpoint_pcb' % args.model_file)
 
     net = refined_pcb_train(args, net, criterion, trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        filename = '%s.checkpoint_rpp' % args.model_file
-        torch.save(get_net(args, net).cpu().state_dict(), filename)
+        save_model(net, '%s.checkpoint_rpp' % args.model_file)
 
     net = overall_fine_tune_train(args, net, criterion,
                                   trainloader, train_sampler)
     if (not args.distributed) or args.dist_rank == 0:
-        filename = '%s.checkpoint_fnl' % args.model_file
-        torch.save(get_net(args, net).cpu().state_dict(), filename)
+        save_model(net, '%s.checkpoint_fnl' % args.model_file)
     log('[ END ] Training')

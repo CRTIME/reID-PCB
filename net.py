@@ -89,13 +89,15 @@ class Net(nn.Module):
         convs: Some 1x1 convolution layers to reduces the dimension of column vector.
         fcs: Some full-connected layers to classification.
     """
-    def __init__(self, out_size=1501, p=6):
+    def __init__(self, out_size=1501, p=6, conv_std=0.001, rpp_std=0.01):
         """
         Args:
             out_size: The number of training labels.
         """
         super(Net, self).__init__()
         self.p = p
+        self.conv_std = conv_std
+        self.rpp_std = rpp_std
 
         resnet = resnet50(pretrained=True)
         self.resnet = nn.Sequential(*list(resnet.children())[:-2])
@@ -111,7 +113,7 @@ class Net(nn.Module):
                 nn.ReLU(inplace=True)
             ))
             fc = nn.Linear(256, out_size)
-            init.normal(fc.weight, std=0.001)
+            init.normal(fc.weight, std=conv_std)
             init.constant(fc.bias, 0)
             self.fcs.append(fc)
 
@@ -134,7 +136,7 @@ class Net(nn.Module):
 
     def convert_to_rpp(self):
         self.pool = RPP(vector_length=2048, p=self.p)
-        init.normal(self.pool.classifier.weight, std=0.01)
+        init.normal(self.pool.classifier.weight, std=self.rpp_std)
         init.constant(self.pool.classifier.bias, 0)
         return self
 
@@ -163,7 +165,7 @@ class FeatureExtractor(Net):
                 where p is the number of parts.
         """
         x = self.resnet.forward(x)
-        y = self.rpp(x)
+        y = self.pool(x)
         for i in range(6):
             if self.last_conv:
                 y[i] = self.convs[i](y[i])

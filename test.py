@@ -156,13 +156,13 @@ def test(args):
     log('[ END ] Loading Query Data')
 
     log('[START] Extracting Query Features')
-    query_feat, query_labels, query_cameras, query_files =
-        extract_feat(args, feat_extractor, queryloader, feat_dim)
+    query_feat, query_labels, query_cameras, query_files = extract_feat(
+        args, feat_extractor, queryloader, feat_dim)
     log('[ END ] Extracting Query Features')
 
     log('[START] Extracting Test Features')
-    test_feat, test_labels, test_cameras, test_files =
-        extract_feat(args, feat_extractor, testloader, feat_dim)
+    test_feat, test_labels, test_cameras, test_files = extract_feat(
+        args, feat_extractor, testloader, feat_dim)
     log('[ END ] Extracting Test Features')
 
     log('[START] Calculating Distances')
