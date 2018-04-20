@@ -10,6 +10,7 @@ from torch.nn.parallel import DistributedDataParallel
 
 from utils import log
 from utils import save_model
+from utils import do_cprofile
 from config import transform
 from data import Market1501
 from utils import get_time
@@ -97,6 +98,7 @@ def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
                      optimizer_40, optimizer_60)
     return net
 
+@do_cprofile('train.prof')
 def train(args):
 
     if args.distributed:

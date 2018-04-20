@@ -53,7 +53,7 @@ class RPP(nn.Module):
         self.p = p
 
         self.classifier = nn.Linear(vector_length, p)
-        self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.Softmax(dim=3)
 
     def forward(self, x):
         """
@@ -64,15 +64,15 @@ class RPP(nn.Module):
             y: Feature vectors. [N, C, 1, 1] x p
         """
         N, C, H, W = x.size()
-        vectors = x.permute(0, 2, 3, 1).contiguous().view(-1, C)
+        vectors = x.permute(0, 2, 3, 1)
         prob = self.softmax(self.classifier(vectors))
-        masks = prob.view(N, H, W, self.p).permute(3, 0, 1, 2).contiguous()
+        masks = prob.permute(3, 0, 1, 2).contiguous()
+        imgs = x.permute(1, 0, 2, 3).contiguous().view(C, -1)
         y = []
-        for i in range(6):
-            # mask.size(): N, H, W
-            mask = masks[i, :, :, :]
-            x_i = x.permute(1, 0, 2, 3).contiguous()
-            y_i = torch.mul(x_i.view(C, -1), mask.view(-1))
+        for mask in masks:
+            # mask.size(): [N, H, W]
+            # imgs.size(): [C, N x H x W]
+            y_i = torch.mul(imgs, mask.view(-1))
             y_i = y_i.view(C, N, H, W).permute(1, 0, 2, 3).contiguous()
             y_i = F.adaptive_avg_pool2d(y_i, (1, 1))
             y.append(y_i)
