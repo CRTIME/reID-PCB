@@ -23,8 +23,8 @@ class PCB(nn.Module):
         self.p = p
 
     def forward(self, x):
-        assert x.size()[2] % self.p == 0
-        h = int(x.size()[2] / self.p)
+        assert x.size(2) % self.p == 0
+        h = int(x.size(2) / self.p)
         y = []
         for i in range(self.p):
             y_i = x[:, :, i*h:(i+1)*h, :]
@@ -172,20 +172,18 @@ class FeatureExtractor(Net):
                 y[i] = y[i].view(-1, 256)
             else:
                 y[i] = y[i].view(-1, 2048)
-        y = torch.cat(y, 1)
+        y = F.normalize(torch.cat(y, 1))
         return y
 
 class MyCrossEntropyLoss(nn.CrossEntropyLoss):
     """Cross Entropy Loss for multiple output.
     """
-    def __init__(self, args):
+    def __init__(self):
         super(MyCrossEntropyLoss, self).__init__()
-        self.use_gpu = args.use_gpu
+
     def forward(self, inputs, target):
-        ret = Variable(torch.FloatTensor([0])).cuda()
-        if not self.use_gpu:
-            ret = Variable(torch.FloatTensor([0]))
-        for ipt in inputs:
-            ret += F.cross_entropy(ipt, target, self.weight, self.size_average,
-                                   self.ignore_index, self.reduce)
-        return ret
+        return torch.sum(torch.cat(
+            [F.cross_entropy(ipt, target,
+            self.weight, self.size_average,
+            self.ignore_index, self.reduce)
+            for ipt in inputs]))

@@ -122,7 +122,7 @@ def train(args):
 
     log('[START] Building Net')
     net = Net(rpp_std=args.rpp_std, conv_std=args.conv_std)
-    criterion = MyCrossEntropyLoss(args)
+    criterion = MyCrossEntropyLoss()
     if args.use_gpu:
         net = net.cuda()
         criterion = criterion.cuda()
