@@ -131,7 +131,7 @@ class Net(nn.Module):
         for i in range(self.p):
             y[i] = self.convs[i](y[i])
             y[i] = y[i].view(-1, 256)
-            y[i] = F.normalize(y[i])
+            y[i] = F.normalize(y[i]) * 10
             y[i] = self.fcs[i](y[i])
         return y
 
@@ -173,7 +173,7 @@ class FeatureExtractor(Net):
                 y[i] = y[i].view(-1, 256)
             else:
                 y[i] = y[i].view(-1, 2048)
-            y[i] = F.normalize(y[i])
+            y[i] = F.normalize(y[i]) * 10
         y = torch.cat(y, 1)
         # y = F.normalize(torch.cat(y, 1))
         return y
