@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn import Parameter
 from torch.autograd import Variable
 import torch.nn.functional as F
-from torchvision.models import resnet50
+from resnet import resnet50
 import torch.utils.model_zoo as model_zoo
 
 import torch.nn.init as init
@@ -99,8 +99,9 @@ class Net(nn.Module):
         self.conv_std = conv_std
         self.rpp_std = rpp_std
 
-        resnet = resnet50(pretrained=True)
-        self.resnet = nn.Sequential(*list(resnet.children())[:-2])
+        self.resnet = resnet50(pretrained=True,
+                          last_conv_stride=1,
+                          last_conv_dilation=1)
 
         self.pool = PCB(p=p)
 
