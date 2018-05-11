@@ -6,10 +6,11 @@ This project tries to reproduce paper [Beyond Part Models: Person Retrieval with
 
 In Market-1501:
 
-|                    | mAP (%) | Rank-1(%) |
-|:------------------:|:-------:|:---------:|
-| Market-1501(paper) |  77.30  |   92.40   |
-|     Market-1501    |  74.03  |   89.43   |
+|                          | mAP (%) | Rank-1(%) |
+|:------------------------:|:-------:|:---------:|
+| Market-1501(paper, PCB)  |  77.30  |   92.40   |
+| Market-1501(paper, +RPP) |  81.60  |   93.80   |
+|        Market-1501       |  74.03  |   89.43   |
 
 ## Usage
 

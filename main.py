@@ -60,6 +60,10 @@ if __name__ == '__main__':
         type=str, default='train',
         help='running stage. train, test or all. (default train)'
     )
+    parser.add_argument('--test-type',
+        type=str, default='pcb',
+        help='model type when testing. pcb, rpp or fnl. (default pcb)'
+    )
     parser.add_argument('--rpp-std',
         type=float, default=0.01,
         help='standard deviation of initialization of rpp layer. (default 0.01)'

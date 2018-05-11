@@ -145,7 +145,7 @@ class Net(nn.Module):
 class FeatureExtractor(Net):
     """Feature extractor
     """
-    def __init__(self, state_path, last_conv=True):
+    def __init__(self, state_path, last_conv=True, model_type='pcb'):
         """
         Args:
             state_path: Path to the state dict file.
@@ -153,6 +153,8 @@ class FeatureExtractor(Net):
         """
         super(FeatureExtractor, self).__init__()
         self.last_conv = last_conv
+        if not model_type == 'pcb':
+            self.convert_to_rpp()
         self.load_state_dict(torch.load(state_path), strict=False)
 
     def forward(self, x):

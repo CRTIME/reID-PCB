@@ -137,7 +137,8 @@ def visualize(dist, query_files, test_files):
 def test(args):
 
     feat_extractor = FeatureExtractor(state_path=args.model_file,
-                                      last_conv=args.last_conv)
+                                      last_conv=args.last_conv,
+                                      model_type=args.test_type)
     if args.use_gpu:
         feat_extractor = DataParallel(feat_extractor)
         feat_extractor.cuda()

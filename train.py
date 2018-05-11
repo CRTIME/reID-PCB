@@ -25,7 +25,7 @@ def base_train(args, net, criterion, trainloader, train_sampler,
     for epoch in range(args.epoch):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        optimizer = optimizer_40 if epoch < 40 else optimizer_60
+        optimizer = optimizer_40 if (optimizer_60 is None or epoch < 40) else optimizer_60
         epoch_loss = .0
         for i, data in enumerate(trainloader):
             net.train()
@@ -71,23 +71,25 @@ def refined_pcb_train(args, net, criterion, trainloader, train_sampler):
             net = DistributedDataParallel(net)
         else:
             net = DataParallel(net)
-    optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1,
-                             momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01,
-                             momentum=0.9, weight_decay=0.0005)
+    args.epoch = 10
+    optimizer = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01,
+                          momentum=0.9, weight_decay=0.0005)
     args.process_name = 'refined_pcb_train'
     net = base_train(args, net, criterion, trainloader, train_sampler,
-                     optimizer_40, optimizer_60)
+                     optimizer, None)
     return net
+    # optimizer_40 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.1,
+    #                          momentum=0.9, weight_decay=0.0005)
+    # optimizer_60 = optim.SGD(get_net(args, net).pool.parameters(), lr=0.01,
+    #                          momentum=0.9, weight_decay=0.0005)
+    # args.process_name = 'refined_pcb_train'
+    # net = base_train(args, net, criterion, trainloader, train_sampler,
+    #                  optimizer_40, optimizer_60)
+    # return net
 
 def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
-    optimizer_40 = optim.SGD([
-        { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.01 },
-        { 'params': get_net(args, net).convs.parameters() },
-        { 'params': get_net(args, net).fcs.parameters() },
-        { 'params': get_net(args, net).pool.parameters() }
-    ], lr=0.1, momentum=0.9, weight_decay=0.0005)
-    optimizer_60 = optim.SGD([
+    args.epoch = 10
+    optimizer = optim.SGD([
         { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.001 },
         { 'params': get_net(args, net).convs.parameters() },
         { 'params': get_net(args, net).fcs.parameters() },
@@ -95,8 +97,24 @@ def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
     ], lr=0.01, momentum=0.9, weight_decay=0.0005)
     args.process_name = 'overall_fine_tune_train'
     net = base_train(args, net, criterion, trainloader, train_sampler,
-                     optimizer_40, optimizer_60)
+                     optimizer, None)
     return net
+    # optimizer_40 = optim.SGD([
+    #     { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.01 },
+    #     { 'params': get_net(args, net).convs.parameters() },
+    #     { 'params': get_net(args, net).fcs.parameters() },
+    #     { 'params': get_net(args, net).pool.parameters() }
+    # ], lr=0.1, momentum=0.9, weight_decay=0.0005)
+    # optimizer_60 = optim.SGD([
+    #     { 'params': get_net(args, net).resnet.parameters(), 'lr': 0.001 },
+    #     { 'params': get_net(args, net).convs.parameters() },
+    #     { 'params': get_net(args, net).fcs.parameters() },
+    #     { 'params': get_net(args, net).pool.parameters() }
+    # ], lr=0.01, momentum=0.9, weight_decay=0.0005)
+    # args.process_name = 'overall_fine_tune_train'
+    # net = base_train(args, net, criterion, trainloader, train_sampler,
+    #                  optimizer_40, optimizer_60)
+    # return net
 
 @do_cprofile('train.prof')
 def train(args):
