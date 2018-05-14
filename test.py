@@ -25,7 +25,7 @@ def extract_feat(args, extractor, dataloader, feat_dim):
         extractor.eval()
         inputs, l, c, f = data
         inputs = Variable(inputs, volatile=True)
-        if args.use_gpu:
+        if args.gpu:
             inputs = inputs.cuda()
         outputs = extractor.forward(inputs)
         feat.append(outputs)
@@ -138,8 +138,9 @@ def test(args):
 
     feat_extractor = FeatureExtractor(state_path=args.model_file,
                                       last_conv=args.last_conv,
+                                      normalize=args.normalize,
                                       model_type=args.test_type)
-    if args.use_gpu:
+    if args.gpu:
         feat_extractor = DataParallel(feat_extractor)
         feat_extractor.cuda()
 
@@ -168,7 +169,7 @@ def test(args):
 
     log('[START] Calculating Distances')
     dist = None
-    if args.use_gpu:
+    if args.gpu:
         dist = calc_dist(query_feat, test_feat)
     else:
         dist = get_dist(query_feat, test_feat)

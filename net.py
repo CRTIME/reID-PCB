@@ -86,18 +86,27 @@ class Net(nn.Module):
         resnet: ResNet-50, the backbone network.
         pool: Part-based convolutional baseline (PCB) layer or
               Refined part pooling (RPP) layer.
-        convs: Some 1x1 convolution layers to reduces the dimension of column vector.
+        convs: Some 1x1 convolution layers to reduces the dimension of
+               column vector.
         fcs: Some full-connected layers to classification.
     """
-    def __init__(self, out_size=1501, p=6, conv_std=0.001, rpp_std=0.01):
+    def __init__(self, out_size=1501, p=6, last_conv=True,
+                 normalize=True, conv_std=0.001, rpp_std=0.01):
         """
         Args:
             out_size: The number of training labels.
+            p: The number of parts.
+            last_conv: Whether contains the last convolution layer.
+            conv_std: The standard deviation of initialization of conv layer.
+            rpp_std: The standard deviation of initialization of rpp layer.
+            normalize: Whether normalize feature vector.
         """
         super(Net, self).__init__()
         self.p = p
+        self.last_conv = last_conv
         self.conv_std = conv_std
         self.rpp_std = rpp_std
+        self.normalize = normalize
 
         self.resnet = resnet50(pretrained=True,
                           last_conv_stride=1,
@@ -105,18 +114,25 @@ class Net(nn.Module):
 
         self.pool = PCB(p=p)
 
-        self.convs = nn.ModuleList()
         self.fcs = nn.ModuleList()
-        for _ in range(p):
-            self.convs.append(nn.Sequential(
-                nn.Conv2d(2048, 256, 1),
-                nn.BatchNorm2d(256),
-                nn.ReLU(inplace=True)
-            ))
-            fc = nn.Linear(256, out_size)
-            init.normal(fc.weight, std=conv_std)
-            init.constant(fc.bias, 0)
-            self.fcs.append(fc)
+        if self.last_conv:
+            self.convs = nn.ModuleList()
+            for _ in range(p):
+                self.convs.append(nn.Sequential(
+                    nn.Conv2d(2048, 256, 1),
+                    nn.BatchNorm2d(256),
+                    nn.ReLU(inplace=True)
+                ))
+                fc = nn.Linear(256, out_size)
+                init.normal(fc.weight, std=conv_std)
+                init.constant(fc.bias, 0)
+                self.fcs.append(fc)
+        else:
+            for _ in range(p):
+                fc = nn.Linear(2048, out_size)
+                init.normal(fc.weight, std=conv_std)
+                init.constant(fc.bias, 0)
+                self.fcs.append(fc)
 
     def forward(self, x):
         """
@@ -130,9 +146,13 @@ class Net(nn.Module):
         x = self.resnet.forward(x)
         y = self.pool(x)
         for i in range(self.p):
-            y[i] = self.convs[i](y[i])
-            y[i] = y[i].view(-1, 256)
-            y[i] = F.normalize(y[i]) * 10
+            if self.last_conv:
+                y[i] = self.convs[i](y[i])
+                y[i] = y[i].view(-1, 256)
+            else:
+                y[i] = y[i].view(-1, 2048)
+            if self.normalize:
+                y[i] = F.normalize(y[i]) * 10
             y[i] = self.fcs[i](y[i])
         return y
 
@@ -145,17 +165,21 @@ class Net(nn.Module):
 class FeatureExtractor(Net):
     """Feature extractor
     """
-    def __init__(self, state_path, last_conv=True, model_type='pcb'):
+    def __init__(self, state_path, last_conv=True, normalize=True,
+                 model_type='pcb'):
         """
         Args:
             state_path: Path to the state dict file.
             last_conv: Whether contains the last convolution layer.
+            model_type: PCB or RPP.
+            normalize: Whether normalize feature vector.
         """
-        super(FeatureExtractor, self).__init__()
+        super(FeatureExtractor, self).__init__(last_conv=last_conv, normalize=normalize)
         self.last_conv = last_conv
+        self.normalize = normalize
         if not model_type == 'pcb':
             self.convert_to_rpp()
-        self.load_state_dict(torch.load(state_path), strict=False)
+        self.load_state_dict(torch.load(state_path), strict=True)
 
     def forward(self, x):
         """
@@ -170,13 +194,14 @@ class FeatureExtractor(Net):
         """
         x = self.resnet.forward(x)
         y = self.pool(x)
-        for i in range(6):
+        for i in range(len(y)):
             if self.last_conv:
                 y[i] = self.convs[i](y[i])
                 y[i] = y[i].view(-1, 256)
             else:
                 y[i] = y[i].view(-1, 2048)
-            y[i] = F.normalize(y[i]) * 10
+            if self.normalize:
+                y[i] = F.normalize(y[i]) * 10
         y = torch.cat(y, 1)
         # y = F.normalize(torch.cat(y, 1))
         return y

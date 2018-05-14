@@ -20,9 +20,9 @@ if __name__ == '__main__':
         type=str, default='reid.pth.tar',
         help='filename of model parameters.'
     )
-    parser.add_argument('--use-gpu',
-        type=int, default=1,
-        help='set 1 if want to use GPU, otherwise 0. (default 1)'
+    parser.add_argument('--no-gpu',
+        action='store_true',
+        help='whether use GPU. (default True)'
     )
     parser.add_argument('--world-size',
         type=int, default=1,
@@ -36,9 +36,9 @@ if __name__ == '__main__':
         type=int, default=0,
         help='rank of distributed process. (default 0)'
     )
-    parser.add_argument('--last-conv',
-        type=int, default=1,
-        help='whether contains last convolution layter. (default 1)'
+    parser.add_argument('--no-lastconv',
+        action='store_true',
+        help='whether contains last convolution layter. (default True)'
     )
     parser.add_argument('--batch-size',
         type=int, default=64,
@@ -49,8 +49,8 @@ if __name__ == '__main__':
         help='number of workers when loading data. (default 20)'
     )
     parser.add_argument('--load-once',
-        type=int, default=0,
-        help='load all of data at once. (default 0)'
+        action='store_true',
+        help='load all of data at once. (default False)'
     )
     parser.add_argument('--epoch',
         type=int, default=60,
@@ -72,10 +72,13 @@ if __name__ == '__main__':
         type=float, default=0.001,
         help='standard deviation of initialization of conv layer. (default 0.001)'
     )
+    parser.add_argument('--normalize',
+        action='store_true',
+        help='whether normalize feature vector. (default True)'
+    )
     args = parser.parse_args()
-    args.use_gpu = args.use_gpu == 1
-    args.last_conv = args.last_conv == 1
-    args.load_once = args.load_once == 1
+    args.gpu = not args.no_gpu
+    args.last_conv = not args.no_lastconv
     args.distributed = args.world_size > 1
     args.home = os.path.expanduser(os.getenv('TORCH_HOME', '~/.torch'))
     args.dataset = os.path.join(args.home, 'datasets')
