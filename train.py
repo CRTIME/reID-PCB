@@ -20,8 +20,16 @@ from net import MyCrossEntropyLoss
 def get_net(args, net):
     return net.module if args.use_gpu else net
 
+""" Gradient averaging. """
+def average_gradients(model):
+    size = float(dist.get_world_size())
+    for param in model.parameters():
+        dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
+        param.grad.data /= size
+
 def base_train(args, net, criterion, trainloader, train_sampler,
                optimizer_40, optimizer_60):
+    LOG_FREQ = 20
     for epoch in range(args.epoch):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -38,12 +46,16 @@ def base_train(args, net, criterion, trainloader, train_sampler,
 
             optimizer.zero_grad()
             loss.backward()
+
+            if args.distributed and not args.use_gpu:
+                average_gradients(net)
+
             optimizer.step()
 
             epoch_loss += loss.data[0]
-            if i % 21 == 20:
+            if i % (LOG_FREQ + 1) == LOG_FREQ:
                 log('[%s] [Epoch] %2d [Iter] %3d [Loss] %.10f' %
-                    (args.process_name, epoch, i, epoch_loss / 21))
+                    (args.process_name, epoch, i, epoch_loss / (LOG_FREQ + 1)))
                 epoch_loss = .0
     return net
 
@@ -96,8 +108,12 @@ def overall_fine_tune_train(args, net, criterion, trainloader, train_sampler):
 def train(args):
 
     if args.distributed:
-        dist.init_process_group(backend='gloo', init_method=args.dist_url,
-            world_size=args.world_size, rank=args.dist_rank)
+        dist.init_process_group(
+            backend=args.dist_backend,
+            init_method=args.dist_url,
+            world_size=args.world_size,
+            rank=args.dist_rank
+        )
 
     log('[START] Loading Training Data')
     trainset = Market1501(root=args.dataset, data_type='train',

@@ -72,6 +72,10 @@ if __name__ == '__main__':
         type=float, default=0.001,
         help='standard deviation of initialization of conv layer. (default 0.001)'
     )
+    parser.add_argument('--dist-backend',
+        type=str, default='tcp',
+        help='backend of distributed training. tcp, gloo or mpi. (default tcp)'
+    )
     args = parser.parse_args()
     args.use_gpu = args.use_gpu == 1
     args.last_conv = args.last_conv == 1
